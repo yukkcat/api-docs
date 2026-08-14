@@ -1,6 +1,5 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { apiConsoleUrl, appNames, brandLogoUrl, githubProfileUrl, shopUrl } from './shared';
-import { ArrowUpRight, ShoppingBag } from 'lucide-react';
+import { appNames, brandLogoUrl, githubProfileUrl } from './shared';
 import { i18n } from './i18n';
 import { uiTranslations } from 'fumadocs-ui/i18n';
 
@@ -70,28 +69,6 @@ export function baseOptions(locale: string): BaseLayoutProps {
       ),
     },
     links: [
-      {
-        text: (
-          <span className="inline-flex items-center gap-1.5">
-            <ShoppingBag className="size-4" />
-            <span>{chinese ? '购买额度' : 'Buy Credits'}</span>
-          </span>
-        ),
-        url: shopUrl,
-        external: true,
-        on: 'nav',
-      },
-      {
-        text: (
-          <span className="inline-flex items-center gap-1.5">
-            <span>{chinese ? 'API 控制台' : 'API Console'}</span>
-            <ArrowUpRight className="size-4" />
-          </span>
-        ),
-        url: apiConsoleUrl,
-        external: true,
-        on: 'nav',
-      },
       {
         type: 'icon',
         text: 'GitHub',
