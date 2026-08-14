@@ -1,0 +1,37 @@
+---
+title: Chat models
+description: OpenAI-compatible chat models currently available through Klong API
+---
+
+All models below use the same [`/v1/chat/completions`](./chat-completions) request format. Only the `model` value changes.
+
+## GPT
+
+| Model | Best for |
+| --- | --- |
+| `gpt-5.6-sol` | Complex reasoning, coding, and agentic tasks |
+| `gpt-5.6-terra` | General chat and everyday development |
+| `gpt-5.5` | High-capability general tasks |
+| `gpt-5.4` | General chat |
+| `gpt-5.4-mini` | Lightweight general tasks |
+| `gpt-5.5-openai-compact` | Compact compatibility channel |
+| `gpt-5.4-openai-compact` | Compact compatibility channel |
+
+## Claude
+
+| Family | Models |
+| --- | --- |
+| Opus | `claude-opus-5`, `claude-opus-5-thinking`, `claude-opus-4-8`, `claude-opus-4-8-thinking`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-opus-4-6-thinking` |
+| Sonnet | `claude-sonnet-5`, `claude-sonnet-5-thinking`, `claude-sonnet-4-6` |
+| Haiku | `claude-haiku-4-5-20251001` |
+| Fable | `claude-fable-5` |
+
+The `-thinking` suffix identifies a thinking variant. Claude models can also be called through the OpenAI-compatible request format.
+
+## Other models
+
+| Model | Description |
+| --- | --- |
+| `codex-auto-review` | Specialized code review model |
+
+> Availability may change with upstream configuration. Refer to the API Console for the current list.

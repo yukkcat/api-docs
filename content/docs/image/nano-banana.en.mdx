@@ -1,0 +1,337 @@
+---
+title: Nano Banana
+description: Gemini generateContent API for text-to-image and image-to-image requests
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+<img src="/gemini-avatar.svg" alt="Nano Banana illustration" width="220" />
+
+```http
+POST https://api.klong.lat/v1beta/models/{model}:generateContent
+x-goog-api-key: <API_KEY>
+Content-Type: application/json
+```
+
+## Models
+
+The request format is identical; only the model name changes:
+
+| Model | Best for |
+| --- | --- |
+| `gemini-3-pro-image-preview` | Image quality |
+| `gemini-3.1-flash-image-preview` | Speed; also supports `8:1` / `4:1` / `1:4` / `1:8` ultra-wide and ultra-tall ratios |
+| `gemini-3-pro-image-preview-c` | Enterprise Pro; native 4K, concurrency, and a 100% success rate |
+| `gemini-3.1-flash-image-preview-c` | Enterprise Flash; native 4K, concurrency, and a 100% success rate |
+
+Enterprise and standard models use the same native Gemini request format. Only replace the model name in the URL.
+
+## Parameters
+
+Set the aspect ratio and resolution under `generationConfig.responseFormat.image`:
+
+| Parameter | Description |
+| --- | --- |
+| `responseFormat.image.aspectRatio` | Aspect ratio from the table below; omit it for image-to-image requests to follow the reference image automatically |
+| `responseFormat.image.imageSize` | `1K` / `2K` / `4K`; the K must be uppercase |
+| `responseModalities` | `['IMAGE']` returns base64, `['TEXT']` returns a URL, and `['IMAGE','TEXT']` returns both |
+
+> Do not send `aspectRatio: "auto"`. Omit `aspectRatio` to use automatic sizing.
+
+## Supported ratios and pixels
+
+All four models support these ten common aspect ratios:
+
+| Ratio | 1K | 2K | 4K |
+| --- | --- | --- | --- |
+| `1:1` | 1024x1024 | 2048x2048 | 4096x4096 |
+| `16:9` | 1376x768 | 2752x1536 | 5504x3072 |
+| `9:16` | 768x1376 | 1536x2752 | 3072x5504 |
+| `4:3` | 1200x896 | 2400x1792 | 4800x3584 |
+| `3:4` | 896x1200 | 1792x2400 | 3584x4800 |
+| `3:2` | 1264x848 | 2528x1696 | 5056x3392 |
+| `2:3` | 848x1264 | 1696x2528 | 3392x5056 |
+| `5:4` | 1152x928 | 2304x1856 | 4608x3712 |
+| `4:5` | 928x1152 | 1856x2304 | 3712x4608 |
+| `21:9` | 1584x672 | 3168x1344 | 6336x2688 |
+
+Only the Flash family, `gemini-3.1-flash-image-preview` and `gemini-3.1-flash-image-preview-c`, supports ultra-wide and ultra-tall output: `8:1` = 2928x352, `4:1` = 2064x512, `1:4` = 512x2064, and `1:8` = 352x2928. Multiply each dimension by 2 or 4 for 2K or 4K.
+
+## Quick start
+
+<Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
+<Tab>
+
+```bash
+curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent" \
+  -H "x-goog-api-key: <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "role": "user",
+      "parts": [{ "text": "A red apple on a wooden table, soft studio light, minimal background" }]
+    }],
+    "generationConfig": {
+      "responseModalities": ["IMAGE"],
+      "responseFormat": {
+        "image": { "aspectRatio": "1:1", "imageSize": "1K" }
+      }
+    }
+  }'
+```
+
+</Tab>
+<Tab>
+
+```bash
+pip install requests
+```
+
+```python
+import requests
+
+url = "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"
+payload = {
+    "contents": [{
+        "role": "user",
+        "parts": [{"text": "A red apple on a wooden table, soft studio light, minimal background"}],
+    }],
+    "generationConfig": {
+        "responseModalities": ["IMAGE"],
+        "responseFormat": {
+            "image": {"aspectRatio": "1:1", "imageSize": "1K"},
+        },
+    },
+}
+
+response = requests.post(
+    url,
+    headers={"x-goog-api-key": "<API_KEY>"},
+    json=payload,
+)
+response.raise_for_status()
+print(response.json())
+```
+
+</Tab>
+<Tab>
+
+```javascript
+const url =
+  "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent";
+
+const response = await fetch(url, {
+  method: "POST",
+  headers: {
+    "x-goog-api-key": "<API_KEY>",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    contents: [{
+      role: "user",
+      parts: [{ text: "A red apple on a wooden table, soft studio light, minimal background" }],
+    }],
+    generationConfig: {
+      responseModalities: ["IMAGE"],
+      responseFormat: {
+        image: { aspectRatio: "1:1", imageSize: "1K" },
+      },
+    },
+  }),
+});
+
+console.log(await response.json());
+```
+
+</Tab>
+<Tab>
+
+```php
+<?php
+$url = "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent";
+$payload = [
+    "contents" => [[
+        "role" => "user",
+        "parts" => [[
+            "text" => "A red apple on a wooden table, soft studio light, minimal background",
+        ]],
+    ]],
+    "generationConfig" => [
+        "responseModalities" => ["IMAGE"],
+        "responseFormat" => [
+            "image" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
+        ],
+    ],
+];
+
+$ch = curl_init($url);
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        "x-goog-api-key: <API_KEY>",
+        "Content-Type: application/json",
+    ],
+    CURLOPT_POSTFIELDS => json_encode($payload),
+]);
+
+echo curl_exec($ch);
+```
+
+</Tab>
+<Tab>
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+func main() {
+    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}`)
+    url := "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"
+    req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+    req.Header.Set("x-goog-api-key", "<API_KEY>")
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+
+    data, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(data))
+}
+```
+
+</Tab>
+<Tab>
+
+```java
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class Main {
+  public static void main(String[] args) throws Exception {
+    String body = """
+      {"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}
+      """;
+
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create("https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"))
+        .header("x-goog-api-key", "<API_KEY>")
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(body))
+        .build();
+
+    var response = HttpClient.newHttpClient().send(
+        request, HttpResponse.BodyHandlers.ofString());
+    System.out.println(response.body());
+  }
+}
+```
+
+</Tab>
+<Tab>
+
+```csharp
+using System.Net.Http.Json;
+
+using var client = new HttpClient();
+client.DefaultRequestHeaders.Add("x-goog-api-key", "<API_KEY>");
+
+var response = await client.PostAsJsonAsync(
+    "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent",
+    new {
+        contents = new[] {
+            new {
+                role = "user",
+                parts = new[] {
+                    new {
+                        text = "A red apple on a wooden table, soft studio light, minimal background"
+                    }
+                }
+            }
+        },
+        generationConfig = new {
+            responseModalities = new[] { "IMAGE" },
+            responseFormat = new {
+                image = new { aspectRatio = "1:1", imageSize = "1K" }
+            }
+        }
+    }
+);
+
+Console.WriteLine(await response.Content.ReadAsStringAsync());
+```
+
+</Tab>
+</Tabs>
+
+The image is returned at `candidates[0].content.parts[0].inline_data.data`.
+
+### Text to image - URL
+
+Set `responseModalities` to `["TEXT"]`. The URL is returned at `candidates[0].content.parts[1].file_data.file_uri`. Use `["IMAGE","TEXT"]` to return both base64 and a URL.
+
+### Image to image - base64 input
+
+Add an image part next to the text part in `parts`:
+
+```bash
+curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent" \
+  -H "x-goog-api-key: <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "role": "user",
+      "parts": [
+        { "text": "Convert this to Japanese watercolor while preserving the subject and composition" },
+        {
+          "inline_data": {
+            "mime_type": "image/png",
+            "data": "<BASE64>"
+          }
+        }
+      ]
+    }],
+    "generationConfig": {
+      "responseModalities": ["IMAGE"]
+    }
+  }'
+```
+
+### Image to image - URL input
+
+Replace `inline_data` above with:
+
+```json
+{
+  "file_data": {
+    "mime_type": "image/png",
+    "file_uri": "https://example.com/input.png"
+  }
+}
+```
+
+### Follow the reference ratio at 2K
+
+Pass only `imageSize` and omit `aspectRatio`:
+
+```json
+{
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "responseFormat": {
+      "image": { "imageSize": "2K" }
+    }
+  }
+}
+```
+
+When both `aspectRatio` and `imageSize` are omitted, the upstream service determines the reference ratio and output tier. For text-to-image requests that need a fixed shape, pass both the ratio and resolution.

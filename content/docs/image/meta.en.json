@@ -1,0 +1,6 @@
+{
+  "title": "Image API",
+  "root": true,
+  "defaultOpen": true,
+  "pages": ["gpt-image-2", "nano-banana"]
+}

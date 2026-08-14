@@ -1,0 +1,37 @@
+---
+title: 对话模型
+description: Klong API 当前可用的 OpenAI 兼容对话模型
+---
+
+下列模型都使用相同的 [`/v1/chat/completions`](./chat-completions) 调用格式，只需替换 `model`。
+
+## GPT
+
+| 模型 | 取向 |
+| --- | --- |
+| `gpt-5.6-sol` | 复杂推理、编程与代理任务 |
+| `gpt-5.6-terra` | 通用对话与日常开发 |
+| `gpt-5.5` | 高能力通用任务 |
+| `gpt-5.4` | 通用对话 |
+| `gpt-5.4-mini` | 轻量通用任务 |
+| `gpt-5.5-openai-compact` | Compact 兼容通道 |
+| `gpt-5.4-openai-compact` | Compact 兼容通道 |
+
+## Claude
+
+| 系列 | 模型 |
+| --- | --- |
+| Opus | `claude-opus-5`、`claude-opus-5-thinking`、`claude-opus-4-8`、`claude-opus-4-8-thinking`、`claude-opus-4-7`、`claude-opus-4-6`、`claude-opus-4-6-thinking` |
+| Sonnet | `claude-sonnet-5`、`claude-sonnet-5-thinking`、`claude-sonnet-4-6` |
+| Haiku | `claude-haiku-4-5-20251001` |
+| Fable | `claude-fable-5` |
+
+`-thinking` 后缀为思考版本。Claude 模型也可直接使用 OpenAI 兼容格式调用。
+
+## 其他模型
+
+| 模型 | 说明 |
+| --- | --- |
+| `codex-auto-review` | 代码审查专用模型 |
+
+> 模型可用性可能随后台调整，以 API 控制台当前显示为准。

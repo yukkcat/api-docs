@@ -1,0 +1,200 @@
+---
+title: Responses API
+description: Call Klong chat models through the OpenAI Responses API
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+The Responses API is the recommended interface for new projects and supports simple text input, multimodal content, and tool calls.
+
+```http
+POST https://api.klong.lat/v1/responses
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+## Quick start
+
+<Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
+<Tab>
+
+```bash
+curl https://api.klong.lat/v1/responses \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4-mini",
+    "input": "Introduce yourself in one sentence."
+  }'
+```
+
+</Tab>
+<Tab>
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
+response = client.responses.create(
+    model="gpt-5.4-mini",
+    input="Introduce yourself in one sentence.",
+)
+print(response.output_text)
+```
+
+</Tab>
+<Tab>
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({ apiKey: "<API_KEY>", baseURL: "https://api.klong.lat/v1" });
+const response = await client.responses.create({
+  model: "gpt-5.4-mini",
+  input: "Introduce yourself in one sentence.",
+});
+console.log(response.output_text);
+```
+
+</Tab>
+<Tab>
+
+```php
+<?php
+$ch = curl_init("https://api.klong.lat/v1/responses");
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => ["Authorization: Bearer <API_KEY>", "Content-Type: application/json"],
+    CURLOPT_POSTFIELDS => json_encode([
+        "model" => "gpt-5.4-mini",
+        "input" => "Introduce yourself in one sentence.",
+    ]),
+]);
+echo curl_exec($ch);
+```
+
+</Tab>
+<Tab>
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+func main() {
+    body := []byte(`{"model":"gpt-5.4-mini","input":"Introduce yourself in one sentence."}`)
+    req, _ := http.NewRequest("POST", "https://api.klong.lat/v1/responses", bytes.NewReader(body))
+    req.Header.Set("Authorization", "Bearer <API_KEY>")
+    req.Header.Set("Content-Type", "application/json")
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+    data, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(data))
+}
+```
+
+</Tab>
+<Tab>
+
+```java
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class Main {
+  public static void main(String[] args) throws Exception {
+    String body = """
+      {"model":"gpt-5.4-mini","input":"Introduce yourself in one sentence."}
+      """;
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create("https://api.klong.lat/v1/responses"))
+        .header("Authorization", "Bearer <API_KEY>")
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(body)).build();
+    var response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    System.out.println(response.body());
+  }
+}
+```
+
+</Tab>
+<Tab>
+
+```csharp
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+
+using var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "<API_KEY>");
+var response = await client.PostAsJsonAsync(
+    "https://api.klong.lat/v1/responses",
+    new { model = "gpt-5.4-mini", input = "Introduce yourself in one sentence." }
+);
+Console.WriteLine(await response.Content.ReadAsStringAsync());
+```
+
+</Tab>
+</Tabs>
+
+## Instructions and messages
+
+Pass plain text directly as `input`, or separate high-priority behavior into `instructions`:
+
+```json
+{
+  "model": "gpt-5.4-mini",
+  "instructions": "You are a concise technical assistant.",
+  "input": "What is SSE?"
+}
+```
+
+Use an array for multiple messages:
+
+```json
+{
+  "model": "gpt-5.4-mini",
+  "input": [
+    { "role": "developer", "content": "Answer only in English." },
+    { "role": "user", "content": "Explain the Responses API." }
+  ]
+}
+```
+
+## Streaming
+
+```bash
+curl -N https://api.klong.lat/v1/responses \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4-mini",
+    "input": "Write a short welcome message.",
+    "stream": true
+  }'
+```
+
+Streaming uses SSE. Text deltas arrive as `response.output_text.delta` events.
+
+## Common parameters
+
+| Parameter | Required | Description |
+| --- | --- | --- |
+| `model` | Yes | A model name from [Chat models](./models) |
+| `input` | Yes | A string or message array |
+| `instructions` | No | High-priority instructions for this request |
+| `stream` | No | Set to `true` for SSE streaming |
+| `max_output_tokens` | No | Maximum generated tokens |
+| `tools` | No | Tools available to the model |
+| `tool_choice` | No | Controls tool selection |
+
+## Response
+
+Official SDKs expose the combined text as `response.output_text`. Raw HTTP responses contain an `output` array that may also include tool calls and reasoning items, so do not assume text is always the first item.

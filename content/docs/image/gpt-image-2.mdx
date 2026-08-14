@@ -1,0 +1,292 @@
+---
+title: GPT Image 2
+description: OpenAI Images API 兼容的文生图与图像编辑接口
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+<img src="/gpt-avatar.svg" alt="GPT Image 2 插画" width="220" />
+
+把 `base_url` 换成 `https://api.klong.lat/v1`，官方 SDK 直接用。
+
+> 大部分程序填写 `https://api.klong.lat` 即可。
+
+```http
+POST https://api.klong.lat/v1/images/generations   # 文生图 (application/json)
+POST https://api.klong.lat/v1/images/edits         # 图像编辑 (multipart/form-data)
+Authorization: Bearer <API_KEY>
+```
+
+## 模型与质量
+
+| 模型 | 调用说明 |
+| --- | --- |
+| `gpt-image-2` | 默认模型，仅支持 1K |
+| `gpt-image-2-vip` | `quality` 固定为 `medium`，支持 1K / 2K / 4K |
+| `gpt-image-2-high` | 支持 `quality=medium` 和 `quality=high`，支持 1K / 2K / 4K |
+| `gpt-image-2-c` | 企业级模型，100% 成功率；与其他模型使用相同的调用格式，支持 1K / 2K / 4K |
+
+四个模型都通过同一组文生图与图像编辑接口调用。
+
+## 参数
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `model` | 是 | 上表中的模型名 |
+| `prompt` | 是 | 提示词，中英文皆可 |
+| `size` | 否 | `宽x高` 像素，如 `1024x1024`、`3840x2160`；按模型支持填写 |
+| `quality` | 否 | `gpt-image-2-high` 支持 `medium` / `high`；`gpt-image-2-vip` 固定为 `medium` |
+| `n` | 否 | 一次出几张，默认 `1` |
+| `response_format` | 否 | `url` 或 `b64_json` |
+| `image` | 编辑必填 | 仅 `/edits`：参考图文件，可重复传入多张 |
+
+## 快速调用
+
+<Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
+<Tab>
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "湖蓝色调的山谷，清晨薄雾，极简插画风",
+    "size": "1024x1536"
+  }'
+```
+
+</Tab>
+<Tab>
+
+```bash
+pip install openai
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
+
+resp = client.images.generate(
+    model="gpt-image-2",
+    prompt="湖蓝色调的山谷，清晨薄雾，极简插画风",
+    size="1024x1536",
+)
+
+print(resp.data[0].url)
+```
+
+</Tab>
+<Tab>
+
+```bash
+npm install openai
+```
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "<API_KEY>",
+  baseURL: "https://api.klong.lat/v1",
+});
+
+const resp = await client.images.generate({
+  model: "gpt-image-2",
+  prompt: "湖蓝色调的山谷，清晨薄雾，极简插画风",
+  size: "1024x1536",
+});
+
+console.log(resp.data[0].url);
+```
+
+</Tab>
+<Tab>
+
+```php
+<?php
+$ch = curl_init("https://api.klong.lat/v1/images/generations");
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer <API_KEY>",
+        "Content-Type: application/json",
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        "model" => "gpt-image-2",
+        "prompt" => "湖蓝色调的山谷，清晨薄雾，极简插画风",
+        "size" => "1024x1536",
+    ]),
+]);
+
+echo curl_exec($ch);
+```
+
+</Tab>
+<Tab>
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+func main() {
+    body := []byte(`{"model":"gpt-image-2","prompt":"湖蓝色调的山谷，清晨薄雾，极简插画风","size":"1024x1536"}`)
+    req, _ := http.NewRequest("POST", "https://api.klong.lat/v1/images/generations", bytes.NewReader(body))
+    req.Header.Set("Authorization", "Bearer <API_KEY>")
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+
+    data, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(data))
+}
+```
+
+</Tab>
+<Tab>
+
+```java
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class Main {
+  public static void main(String[] args) throws Exception {
+    String body = """
+      {"model":"gpt-image-2","prompt":"湖蓝色调的山谷，清晨薄雾，极简插画风","size":"1024x1536"}
+      """;
+
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create("https://api.klong.lat/v1/images/generations"))
+        .header("Authorization", "Bearer <API_KEY>")
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(body))
+        .build();
+
+    var response = HttpClient.newHttpClient().send(
+        request, HttpResponse.BodyHandlers.ofString());
+    System.out.println(response.body());
+  }
+}
+```
+
+</Tab>
+<Tab>
+
+```csharp
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+
+using var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Bearer", "<API_KEY>");
+
+var response = await client.PostAsJsonAsync(
+    "https://api.klong.lat/v1/images/generations",
+    new {
+        model = "gpt-image-2",
+        prompt = "湖蓝色调的山谷，清晨薄雾，极简插画风",
+        size = "1024x1536"
+    }
+);
+
+Console.WriteLine(await response.Content.ReadAsStringAsync());
+```
+
+</Tab>
+</Tabs>
+
+### 高质量模型 · `gpt-image-2-high`
+
+使用 `gpt-image-2-high` 时可指定 `medium` 或 `high`：
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2-high",
+    "prompt": "高端香水产品海报，黑色背景，轮廓光，商业摄影",
+    "size": "3840x2160",
+    "quality": "high"
+  }'
+```
+
+文生图、图像编辑和多参考图示例都可以把 `model` 换成其他模型。
+
+### 一次出多张 · `n`
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "湖蓝色调的山谷，清晨薄雾，极简插画风",
+    "size": "1024x1024",
+    "n": 2
+  }'
+```
+
+返回的 `data` 数组中就是对应数量的图片。SDK 中同样传 `n=2`，`n` 在 `/edits` 上也生效。
+
+### 图像编辑 · cURL
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=gpt-image-2" \
+  -F "image=@otter.png" \
+  -F "prompt=给这只海獭戴上一顶贝雷帽"
+```
+
+编辑时不传 `size`，沿用参考图尺寸。不要手动填写 multipart 的 boundary。
+
+### 多张参考图 · cURL
+
+同一个字段名重复出现即可，顺序保留，提示词里用“第一张 / 第二张”指代：
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=gpt-image-2" \
+  -F "image[]=@teapot.png" \
+  -F "image[]=@duck.png" \
+  -F "prompt=把第二张图里的黄色小鸭子放在第一张图的茶壶旁边，保持同样的桌面和光线"
+```
+
+字段名写 `image[]` 或 `image` 都可以，重复出现即为多张。官方 SDK 传数组时发送的是 `image[]`。
+
+### 多张参考图 · Python (OpenAI SDK)
+
+```python
+resp = client.images.edit(
+    model="gpt-image-2",
+    image=[open("teapot.png", "rb"), open("duck.png", "rb")],
+    prompt="把第二张图里的黄色小鸭子放在第一张图的茶壶旁边",
+)
+```
+
+## 响应
+
+```json
+{
+  "created": 1781837823,
+  "data": [
+    { "url": "https://<DOWNLOAD_HOST>/generated/<FILE>.png" }
+  ]
+}
+```
+
+不传 `response_format` 时返回 `url`；传 `response_format=b64_json` 时，每个元素改为 `{"b64_json": "..."}`。`n>1` 时，`data` 数组中按顺序返回多张图片。

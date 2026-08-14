@@ -1,0 +1,6 @@
+{
+  "title": "对话接口",
+  "root": true,
+  "defaultOpen": true,
+  "pages": ["chat-completions", "responses", "claude-messages", "models"]
+}

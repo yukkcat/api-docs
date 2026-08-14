@@ -1,0 +1,336 @@
+---
+title: Chat Completions
+description: 使用 OpenAI 兼容格式调用 Klong 对话模型
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+把 `base_url` 换成 `https://api.klong.lat/v1`，OpenAI SDK 可以直接使用。
+
+> 大部分客户端填写 `https://api.klong.lat` 即可。
+
+```http
+POST https://api.klong.lat/v1/chat/completions
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+## 快速调用
+
+<Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
+<Tab>
+
+```bash
+curl https://api.klong.lat/v1/chat/completions \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4-mini",
+    "messages": [
+      { "role": "system", "content": "你是一个简洁、准确的助手。" },
+      { "role": "user", "content": "用一句话介绍你自己。" }
+    ]
+  }'
+```
+
+</Tab>
+<Tab>
+
+```bash
+pip install openai
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="<API_KEY>",
+    base_url="https://api.klong.lat/v1",
+)
+
+completion = client.chat.completions.create(
+    model="gpt-5.4-mini",
+    messages=[
+        {"role": "system", "content": "你是一个简洁、准确的助手。"},
+        {"role": "user", "content": "用一句话介绍你自己。"},
+    ],
+)
+
+print(completion.choices[0].message.content)
+```
+
+</Tab>
+<Tab>
+
+```bash
+npm install openai
+```
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "<API_KEY>",
+  baseURL: "https://api.klong.lat/v1",
+});
+
+const completion = await client.chat.completions.create({
+  model: "gpt-5.4-mini",
+  messages: [
+    { role: "system", content: "你是一个简洁、准确的助手。" },
+    { role: "user", content: "用一句话介绍你自己。" },
+  ],
+});
+
+console.log(completion.choices[0].message.content);
+```
+
+</Tab>
+<Tab>
+
+```php
+<?php
+$ch = curl_init("https://api.klong.lat/v1/chat/completions");
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer <API_KEY>",
+        "Content-Type: application/json",
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        "model" => "gpt-5.4-mini",
+        "messages" => [
+            ["role" => "user", "content" => "用一句话介绍你自己。"],
+        ],
+    ]),
+]);
+
+echo curl_exec($ch);
+```
+
+</Tab>
+<Tab>
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+func main() {
+    body := []byte(`{"model":"gpt-5.4-mini","messages":[{"role":"user","content":"用一句话介绍你自己。"}]}`)
+    req, _ := http.NewRequest("POST", "https://api.klong.lat/v1/chat/completions", bytes.NewReader(body))
+    req.Header.Set("Authorization", "Bearer <API_KEY>")
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+
+    data, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(data))
+}
+```
+
+</Tab>
+<Tab>
+
+```java
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class Main {
+  public static void main(String[] args) throws Exception {
+    String body = """
+      {"model":"gpt-5.4-mini","messages":[{"role":"user","content":"用一句话介绍你自己。"}]}
+      """;
+
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create("https://api.klong.lat/v1/chat/completions"))
+        .header("Authorization", "Bearer <API_KEY>")
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(body))
+        .build();
+
+    var response = HttpClient.newHttpClient().send(
+        request, HttpResponse.BodyHandlers.ofString());
+    System.out.println(response.body());
+  }
+}
+```
+
+</Tab>
+<Tab>
+
+```csharp
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+
+using var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Bearer", "<API_KEY>");
+
+var response = await client.PostAsJsonAsync(
+    "https://api.klong.lat/v1/chat/completions",
+    new {
+        model = "gpt-5.4-mini",
+        messages = new[] {
+            new { role = "user", content = "用一句话介绍你自己。" }
+        }
+    }
+);
+
+Console.WriteLine(await response.Content.ReadAsStringAsync());
+```
+
+</Tab>
+</Tabs>
+
+## 流式输出
+
+设置 `stream: true`，内容会通过 SSE 边生成边返回。
+
+<Tabs items={['cURL', 'Python', 'Node.js']}>
+<Tab>
+
+```bash
+curl -N https://api.klong.lat/v1/chat/completions \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4-mini",
+    "messages": [{ "role": "user", "content": "写一句欢迎语。" }],
+    "stream": true
+  }'
+```
+
+</Tab>
+<Tab>
+
+```python
+stream = client.chat.completions.create(
+    model="gpt-5.4-mini",
+    messages=[{"role": "user", "content": "写一句欢迎语。"}],
+    stream=True,
+)
+
+for chunk in stream:
+    text = chunk.choices[0].delta.content
+    if text:
+        print(text, end="", flush=True)
+```
+
+</Tab>
+<Tab>
+
+```javascript
+const stream = await client.chat.completions.create({
+  model: "gpt-5.4-mini",
+  messages: [{ role: "user", content: "写一句欢迎语。" }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? "");
+}
+```
+
+</Tab>
+</Tabs>
+
+## 多轮对话
+
+接口不会自动记住上一轮内容。继续对话时，把历史消息一起放入 `messages`。
+
+```json
+{
+  "model": "gpt-5.4-mini",
+  "messages": [
+    { "role": "system", "content": "你是翻译助手。" },
+    { "role": "user", "content": "把 hello 翻译成中文。" },
+    { "role": "assistant", "content": "你好。" },
+    { "role": "user", "content": "那 good night 呢？" }
+  ]
+}
+```
+
+## 图片输入
+
+支持视觉输入的模型可以在 `content` 中同时提供文字和图片 URL。
+
+```bash
+curl https://api.klong.lat/v1/chat/completions \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4",
+    "messages": [{
+      "role": "user",
+      "content": [
+        { "type": "text", "text": "请描述这张图片。" },
+        {
+          "type": "image_url",
+          "image_url": { "url": "https://example.com/image.png" }
+        }
+      ]
+    }]
+  }'
+```
+
+## 常用参数
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `model` | 是 | [对话模型](./models) 中的模型名 |
+| `messages` | 是 | 对话消息数组，常用角色为 `system`、`user`、`assistant` |
+| `stream` | 否 | `true` 开启流式输出，默认 `false` |
+| `temperature` | 否 | 采样随机性，范围 `0` - `2` |
+| `top_p` | 否 | 核采样参数，通常与 `temperature` 二选一调整 |
+| `max_completion_tokens` | 否 | 本次回答最多生成的 token 数 |
+| `tools` | 否 | 模型可调用的工具列表 |
+| `tool_choice` | 否 | 控制是否、以及调用哪个工具 |
+| `response_format` | 否 | 指定 JSON 等结构化输出格式 |
+
+不同模型支持的可选参数可能不同。不确定时，先只传 `model` 和 `messages`。
+
+## 响应
+
+```json
+{
+  "id": "chatcmpl_xxx",
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "你好，我是一个可以通过 API 调用的 AI 助手。"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 28,
+    "completion_tokens": 18,
+    "total_tokens": 46
+  }
+}
+```
+
+非流式文本位于 `choices[0].message.content`；流式文本位于每个数据块的 `choices[0].delta.content`。
+
+## 常见错误
+
+| 状态码 | 处理方法 |
+| --- | --- |
+| `400` | 检查模型名、`messages` 结构和参数是否受支持 |
+| `401` | 检查 API Key 及 `Bearer ` 前缀 |
+| `429` | 检查账户可用额度，或降低并发后重试 |
+| `500` / `502` | 稍后重试；持续失败时联系售后 |

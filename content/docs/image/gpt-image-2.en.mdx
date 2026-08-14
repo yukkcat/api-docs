@@ -1,0 +1,292 @@
+---
+title: GPT Image 2
+description: OpenAI Images API-compatible image generation and editing
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+<img src="/gpt-avatar.svg" alt="GPT Image 2 illustration" width="220" />
+
+Set `base_url` to `https://api.klong.lat/v1` and use the official SDK directly.
+
+> Most applications only require `https://api.klong.lat`.
+
+```http
+POST https://api.klong.lat/v1/images/generations   # Text to image (application/json)
+POST https://api.klong.lat/v1/images/edits         # Image editing (multipart/form-data)
+Authorization: Bearer <API_KEY>
+```
+
+## Models and quality
+
+| Model | Usage |
+| --- | --- |
+| `gpt-image-2` | Default model; supports 1K only |
+| `gpt-image-2-vip` | `quality` is fixed to `medium`; supports 1K / 2K / 4K |
+| `gpt-image-2-high` | Supports `quality=medium` and `quality=high`; supports 1K / 2K / 4K |
+| `gpt-image-2-c` | Enterprise model with 100% success rate; uses the same request format and supports 1K / 2K / 4K |
+
+All four models use the same generation and editing endpoints.
+
+## Parameters
+
+| Parameter | Required | Description |
+| --- | --- | --- |
+| `model` | Yes | A model name from the table above |
+| `prompt` | Yes | Prompt text in English or Chinese |
+| `size` | No | `widthxheight` in pixels, such as `1024x1024` or `3840x2160`; use a size supported by the model |
+| `quality` | No | `gpt-image-2-high` supports `medium` / `high`; `gpt-image-2-vip` is fixed to `medium` |
+| `n` | No | Number of images to generate; default: `1` |
+| `response_format` | No | `url` or `b64_json` |
+| `image` | For edits | Reference image file for `/edits`; repeat the field to upload multiple images |
+
+## Quick start
+
+<Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
+<Tab>
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "A misty mountain valley at dawn, cool blue palette, minimal illustration",
+    "size": "1024x1536"
+  }'
+```
+
+</Tab>
+<Tab>
+
+```bash
+pip install openai
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
+
+resp = client.images.generate(
+    model="gpt-image-2",
+    prompt="A misty mountain valley at dawn, cool blue palette, minimal illustration",
+    size="1024x1536",
+)
+
+print(resp.data[0].url)
+```
+
+</Tab>
+<Tab>
+
+```bash
+npm install openai
+```
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "<API_KEY>",
+  baseURL: "https://api.klong.lat/v1",
+});
+
+const resp = await client.images.generate({
+  model: "gpt-image-2",
+  prompt: "A misty mountain valley at dawn, cool blue palette, minimal illustration",
+  size: "1024x1536",
+});
+
+console.log(resp.data[0].url);
+```
+
+</Tab>
+<Tab>
+
+```php
+<?php
+$ch = curl_init("https://api.klong.lat/v1/images/generations");
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer <API_KEY>",
+        "Content-Type: application/json",
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        "model" => "gpt-image-2",
+        "prompt" => "A misty mountain valley at dawn, cool blue palette, minimal illustration",
+        "size" => "1024x1536",
+    ]),
+]);
+
+echo curl_exec($ch);
+```
+
+</Tab>
+<Tab>
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+func main() {
+    body := []byte(`{"model":"gpt-image-2","prompt":"A misty mountain valley at dawn, cool blue palette, minimal illustration","size":"1024x1536"}`)
+    req, _ := http.NewRequest("POST", "https://api.klong.lat/v1/images/generations", bytes.NewReader(body))
+    req.Header.Set("Authorization", "Bearer <API_KEY>")
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil { panic(err) }
+    defer resp.Body.Close()
+
+    data, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(data))
+}
+```
+
+</Tab>
+<Tab>
+
+```java
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class Main {
+  public static void main(String[] args) throws Exception {
+    String body = """
+      {"model":"gpt-image-2","prompt":"A misty mountain valley at dawn, cool blue palette, minimal illustration","size":"1024x1536"}
+      """;
+
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create("https://api.klong.lat/v1/images/generations"))
+        .header("Authorization", "Bearer <API_KEY>")
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(body))
+        .build();
+
+    var response = HttpClient.newHttpClient().send(
+        request, HttpResponse.BodyHandlers.ofString());
+    System.out.println(response.body());
+  }
+}
+```
+
+</Tab>
+<Tab>
+
+```csharp
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+
+using var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Bearer", "<API_KEY>");
+
+var response = await client.PostAsJsonAsync(
+    "https://api.klong.lat/v1/images/generations",
+    new {
+        model = "gpt-image-2",
+        prompt = "A misty mountain valley at dawn, cool blue palette, minimal illustration",
+        size = "1024x1536"
+    }
+);
+
+Console.WriteLine(await response.Content.ReadAsStringAsync());
+```
+
+</Tab>
+</Tabs>
+
+### High quality - `gpt-image-2-high`
+
+Set `quality` to `medium` or `high` when using `gpt-image-2-high`:
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2-high",
+    "prompt": "Premium perfume campaign, black background, rim lighting, commercial photography",
+    "size": "3840x2160",
+    "quality": "high"
+  }'
+```
+
+The generation, editing, and multi-image examples can use any other model by changing `model`.
+
+### Generate multiple images - `n`
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "A misty mountain valley at dawn, cool blue palette, minimal illustration",
+    "size": "1024x1024",
+    "n": 2
+  }'
+```
+
+The `data` array contains the requested number of images. Pass `n=2` in the SDK in the same way; `n` also works with `/edits`.
+
+### Image editing - cURL
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=gpt-image-2" \
+  -F "image=@otter.png" \
+  -F "prompt=Put a beret on the otter"
+```
+
+Do not pass `size` for edits; the output follows the reference image dimensions. Do not set the multipart boundary manually.
+
+### Multiple reference images - cURL
+
+Repeat the same field name. Order is preserved, so the prompt can refer to the first and second images:
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=gpt-image-2" \
+  -F "image[]=@teapot.png" \
+  -F "image[]=@duck.png" \
+  -F "prompt=Place the yellow duck from the second image beside the teapot in the first image, preserving the table and lighting"
+```
+
+Both `image[]` and `image` are accepted. Repeating either field uploads multiple images. The official SDK sends `image[]` for arrays.
+
+### Multiple reference images - Python (OpenAI SDK)
+
+```python
+resp = client.images.edit(
+    model="gpt-image-2",
+    image=[open("teapot.png", "rb"), open("duck.png", "rb")],
+    prompt="Place the yellow duck from the second image beside the teapot in the first image",
+)
+```
+
+## Response
+
+```json
+{
+  "created": 1781837823,
+  "data": [
+    { "url": "https://<DOWNLOAD_HOST>/generated/<FILE>.png" }
+  ]
+}
+```
+
+Without `response_format`, the API returns `url`. With `response_format=b64_json`, each item becomes `{"b64_json": "..."}`. When `n>1`, the `data` array contains multiple images in order.

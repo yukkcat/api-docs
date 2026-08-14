@@ -1,0 +1,6 @@
+{
+  "title": "Chat API",
+  "root": true,
+  "defaultOpen": true,
+  "pages": ["chat-completions", "responses", "claude-messages", "models"]
+}
