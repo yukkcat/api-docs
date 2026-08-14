@@ -1,13 +1,18 @@
 # syntax=docker/dockerfile:1.7
 
+FROM oven/bun:1.3.13-debian AS deps
+
+WORKDIR /app
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --ignore-scripts
+
 FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
-
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run postinstall && npm run build
 
