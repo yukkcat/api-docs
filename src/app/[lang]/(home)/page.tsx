@@ -1,5 +1,5 @@
 import { localizePath, type Locale } from '@/lib/i18n';
-import { apiConsoleUrl, shopUrl } from '@/lib/shared';
+import { apiConsoleUrl, brandLogoUrl, shopUrl } from '@/lib/shared';
 import {
   ArrowRight,
   Braces,
@@ -107,7 +107,7 @@ export default async function HomePage({ params }: PageProps<'/[lang]'>) {
                 {Icon ? (
                   <Icon className="size-5" />
                 ) : (
-                  <img src="/icon.svg" alt="" aria-hidden="true" className="size-full object-cover" />
+                  <img src={brandLogoUrl} alt="" aria-hidden="true" className="size-full object-cover" />
                 )}
               </span>
               <span className="min-w-0 flex-1">

@@ -1,5 +1,5 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { apiConsoleUrl, appNames, githubProfileUrl, shopUrl } from './shared';
+import { apiConsoleUrl, appNames, brandLogoUrl, githubProfileUrl, shopUrl } from './shared';
 import { ArrowUpRight, ShoppingBag } from 'lucide-react';
 import { i18n } from './i18n';
 import { uiTranslations } from 'fumadocs-ui/i18n';
@@ -64,7 +64,7 @@ export function baseOptions(locale: string): BaseLayoutProps {
       url: locale === 'zh-CN' ? '/' : `/${locale}`,
       title: (
         <span className="inline-flex items-center gap-2 font-semibold">
-          <img src="/icon.svg" alt="" aria-hidden="true" className="size-8 shrink-0 rounded-md" />
+          <img src={brandLogoUrl} alt="" aria-hidden="true" className="size-8 shrink-0 rounded-md" />
           <span>{appName}</span>
         </span>
       ),
