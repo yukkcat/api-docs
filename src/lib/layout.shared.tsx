@@ -1,10 +1,9 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { appNames, gitConfig } from './shared';
+import { appNames, githubProfileUrl } from './shared';
 import { ArrowUpRight } from 'lucide-react';
 import { i18n } from './i18n';
 import { uiTranslations } from 'fumadocs-ui/i18n';
 
-const githubUrl = `https://github.com/${gitConfig.user}`;
 const qqGroupUrl = 'https://qm.qq.com/q/Jt1AF4ZH0s';
 
 function GitHubIcon() {
@@ -48,9 +47,6 @@ export const translations = i18n.translations().extend(uiTranslations()).add('ui
     codeBlockCopied: '已复制',
     menuToggle: '切换菜单',
     pageActionsCopyMarkdown: '复制 Markdown',
-    pageActionsOpen: '打开',
-    pageActionsOpenGitHub: '在 GitHub 中打开',
-    pageActionsViewMarkdown: '查看 Markdown',
     sidebarOpen: '打开侧边栏',
     sidebarCollapse: '收起侧边栏',
     notFoundTitle: '页面不存在',
@@ -83,7 +79,7 @@ export function baseOptions(locale: string): BaseLayoutProps {
         type: 'icon',
         text: 'GitHub',
         label: 'GitHub',
-        url: githubUrl,
+        url: githubProfileUrl,
         external: true,
         on: 'menu',
         icon: <GitHubIcon />,

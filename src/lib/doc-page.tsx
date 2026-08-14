@@ -1,13 +1,9 @@
 import { getMDXComponents } from '@/components/mdx';
-import { gitConfig } from '@/lib/shared';
 import { getPageMarkdownUrl, source } from '@/lib/source';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page';
-import {
-  MarkdownCopyButton,
-  ViewOptionsPopover,
-} from 'fumadocs-ui/layouts/docs/page';
+import { MarkdownCopyButton } from 'fumadocs-ui/layouts/docs/page';
 import { localizePath } from './i18n';
 
 export type DocPageData = (typeof source)['$inferPage'];
@@ -22,10 +18,6 @@ export function DocPageContent({ page }: { page: DocPageData }) {
       <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
-        <ViewOptionsPopover
-          markdownUrl={markdownUrl}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/${gitConfig.docsContentDir}/${page.path}`}
-        />
       </div>
       <DocsBody>
         <MDX

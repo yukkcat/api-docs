@@ -4,10 +4,4 @@ export const appNames = {
 };
 export const docsRoute = '/docs';
 export const docsContentRoute = '/llms.mdx/docs';
-
-export const gitConfig = {
-  user: 'yukkcat',
-  repo: 'klong-docs',
-  branch: 'main',
-  docsContentDir: 'content/docs',
-};
+export const githubProfileUrl = 'https://github.com/yukkcat';
