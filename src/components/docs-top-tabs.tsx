@@ -6,6 +6,7 @@ import { localizePath, type Locale } from '@/lib/i18n';
 import { SidebarTabsDropdown } from 'fumadocs-ui/components/sidebar/tabs/dropdown';
 import type { LayoutTab } from 'fumadocs-ui/layouts/shared';
 import {
+  BookOpenText,
   ImageIcon,
   MessageSquareText,
   MonitorSmartphone,
@@ -22,6 +23,14 @@ type DocsSection = {
 };
 
 const tabs: DocsSection[] = [
+  {
+    title: { 'zh-CN': '快速开始', en: 'Quick Start' },
+    description: { 'zh-CN': '地址、密钥与首次调用', en: 'Endpoint, API key, and first request' },
+    href: '/docs/start/quick-start',
+    prefix: '/docs/start',
+    paths: ['/docs/start/quick-start'],
+    icon: BookOpenText,
+  },
   {
     title: { 'zh-CN': '图像接口', en: 'Image API' },
     description: { 'zh-CN': 'GPT Image 与 Nano Banana', en: 'GPT Image and Nano Banana' },
@@ -45,7 +54,10 @@ const tabs: DocsSection[] = [
   },
   {
     title: { 'zh-CN': '客户端教程', en: 'Client Guides' },
-    description: { 'zh-CN': '即将上线', en: 'Coming soon' },
+    description: { 'zh-CN': 'ChatGPT2API 项目', en: 'ChatGPT2API project' },
+    href: '/docs/client/chatgpt2api',
+    prefix: '/docs/client',
+    paths: ['/docs/client/chatgpt2api'],
     icon: MonitorSmartphone,
   },
 ];

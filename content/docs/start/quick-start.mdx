@@ -1,0 +1,57 @@
+---
+title: 快速开始
+description: 获取密钥、配置接口地址并完成第一次调用
+---
+
+Klong API 兼容 OpenAI 接口格式。准备好 API Key 后，只需要替换接口地址即可调用。
+
+## 获取 API Key
+
+[打开 API 控制台](https://api.klong.lat/) 创建并复制 API Key。需要额度时，前往 [购买额度](https://pay.ldxp.cn/shop/yukkcat)。
+
+## 配置接口地址
+
+OpenAI SDK 使用下面的 Base URL：
+
+```text
+https://api.klong.lat/v1
+```
+
+大部分客户端只需填写：
+
+```text
+https://api.klong.lat
+```
+
+## 调用图像接口
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "清晨薄雾中的山谷，极简插画风",
+    "size": "1024x1024"
+  }'
+```
+
+完整参数与图像编辑示例见 [GPT Image 2](/docs/image/gpt-image-2) 和 [Nano Banana](/docs/image/nano-banana)。
+
+## 调用对话接口
+
+```bash
+curl https://api.klong.lat/v1/chat/completions \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4-mini",
+    "messages": [{ "role": "user", "content": "你好" }]
+  }'
+```
+
+其他调用方式见 [Chat Completions](/docs/chat/chat-completions)、[Responses API](/docs/chat/responses) 和 [Claude Messages](/docs/chat/claude-messages)。
+
+## 客户端与部署
+
+需要自行部署兼容服务时，查看 [ChatGPT2API](/docs/client/chatgpt2api)。

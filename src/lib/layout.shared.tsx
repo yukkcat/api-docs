@@ -1,6 +1,6 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { appNames, githubProfileUrl } from './shared';
-import { ArrowUpRight } from 'lucide-react';
+import { appNames, githubProfileUrl, shopUrl } from './shared';
+import { ArrowUpRight, ShoppingBag } from 'lucide-react';
 import { i18n } from './i18n';
 import { uiTranslations } from 'fumadocs-ui/i18n';
 
@@ -64,6 +64,17 @@ export function baseOptions(locale: string): BaseLayoutProps {
       title: <span className="font-semibold">{appName}</span>,
     },
     links: [
+      {
+        text: (
+          <span className="inline-flex items-center gap-1.5">
+            <ShoppingBag className="size-4" />
+            <span>{chinese ? '购买额度' : 'Buy Credits'}</span>
+          </span>
+        ),
+        url: shopUrl,
+        external: true,
+        on: 'nav',
+      },
       {
         text: (
           <span className="inline-flex items-center gap-1.5">

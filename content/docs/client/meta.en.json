@@ -1,0 +1,6 @@
+{
+  "title": "Client Guides",
+  "root": true,
+  "defaultOpen": true,
+  "pages": ["chatgpt2api"]
+}

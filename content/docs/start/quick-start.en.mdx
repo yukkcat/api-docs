@@ -1,0 +1,57 @@
+---
+title: Quick Start
+description: Get an API key, configure the endpoint, and make your first request
+---
+
+Klong API is compatible with the OpenAI API format. Once you have an API key, replace the endpoint and make your request.
+
+## Get an API key
+
+[Open the API Console](https://api.klong.lat/) to create and copy an API key. Visit [Buy Credits](https://pay.ldxp.cn/shop/yukkcat) when you need more credit.
+
+## Configure the endpoint
+
+Use this Base URL with the OpenAI SDK:
+
+```text
+https://api.klong.lat/v1
+```
+
+Most clients only require:
+
+```text
+https://api.klong.lat
+```
+
+## Call the Image API
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "A valley in the morning mist, minimal editorial illustration",
+    "size": "1024x1024"
+  }'
+```
+
+See [GPT Image 2](/en/docs/image/gpt-image-2) and [Nano Banana](/en/docs/image/nano-banana) for complete parameters and image editing examples.
+
+## Call the Chat API
+
+```bash
+curl https://api.klong.lat/v1/chat/completions \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4-mini",
+    "messages": [{ "role": "user", "content": "Hello" }]
+  }'
+```
+
+For other request formats, see [Chat Completions](/en/docs/chat/chat-completions), [Responses API](/en/docs/chat/responses), and [Claude Messages](/en/docs/chat/claude-messages).
+
+## Clients and deployment
+
+For a self-hosted compatible service, see [ChatGPT2API](/en/docs/client/chatgpt2api).
