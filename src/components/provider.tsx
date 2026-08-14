@@ -20,9 +20,24 @@ function useNormalizedPathname() {
 }
 
 export function Provider({ locale, children }: { locale: string; children: ReactNode }) {
+  const pathname = usePathname();
+  const changeLocale = (nextLocale: string) => {
+    if (nextLocale === locale) return;
+
+    const pathWithoutLocale = pathname.replace(/^\/(?:zh-CN|en)(?=\/|$)/, '') || '/';
+    const localizedPath = nextLocale === 'zh-CN'
+      ? pathWithoutLocale
+      : `/en${pathWithoutLocale === '/' ? '' : pathWithoutLocale}`;
+
+    window.location.assign(`${localizedPath}${window.location.search}${window.location.hash}`);
+  };
+
   return (
     <RootProvider
-      i18n={i18nProvider(translations, locale)}
+      i18n={{
+        ...i18nProvider(translations, locale),
+        onLocaleChange: changeLocale,
+      }}
       search={{
         SearchDialog,
         hotKey: [
