@@ -1,5 +1,5 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { appNames, brandLogoUrl, githubProfileUrl } from './shared';
+import { appNames, githubProfileUrl } from './shared';
 import { i18n } from './i18n';
 import { uiTranslations } from 'fumadocs-ui/i18n';
 
@@ -61,12 +61,7 @@ export function baseOptions(locale: string): BaseLayoutProps {
   return {
     nav: {
       url: locale === 'zh-CN' ? '/' : `/${locale}`,
-      title: (
-        <span className="inline-flex items-center gap-2 font-semibold">
-          <img src={brandLogoUrl} alt="" aria-hidden="true" className="size-8 shrink-0 rounded-md" />
-          <span>{appName}</span>
-        </span>
-      ),
+      title: <span className="font-semibold">{appName}</span>,
     },
     links: [
       {

@@ -4,7 +4,6 @@ export const appNames = {
 };
 export const docsRoute = '/docs';
 export const docsContentRoute = '/llms.mdx/docs';
-export const brandLogoUrl = '/brand/klong-dino-surfboard.svg';
 export const apiConsoleUrl = 'https://api.klong.lat/';
 export const githubProfileUrl = 'https://github.com/yukkcat';
 export const shopUrl = 'https://pay.ldxp.cn/shop/yukkcat';
