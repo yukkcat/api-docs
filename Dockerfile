@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1.7
 
-FROM oven/bun:1.3.13-alpine AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --ignore-scripts
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
 
 COPY . .
-RUN bun run postinstall && bun run build
+RUN npm run postinstall && npm run build
 
 FROM node:22-alpine AS runner
 
