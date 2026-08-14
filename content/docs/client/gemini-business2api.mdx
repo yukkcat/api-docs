@@ -1,0 +1,83 @@
+---
+title: Gemini Business2API
+description: 将 Gemini Business 转换为 OpenAI 兼容 API
+---
+
+[GitHub 仓库](https://github.com/yukkcat/gemini-business2api)
+
+Gemini Business2API 提供多账号调度、管理后台，以及文本、文件、图片和视频能力。主线只包含 2API 服务与管理后台，账号刷新通过可选的 `refresh-worker` 接入。
+
+## Docker Compose
+
+```bash
+git clone https://github.com/yukkcat/gemini-business2api.git
+cd gemini-business2api
+cp .env.example .env
+# 编辑 .env，至少设置 ADMIN_KEY
+docker compose up -d
+```
+
+默认使用 SQLite，数据保存在 `./data`。
+
+| 入口 | 地址 |
+| --- | --- |
+| 管理后台 | `http://localhost:7860/` |
+| OpenAI 兼容接口 | `http://localhost:7860/v1/chat/completions` |
+| 健康检查 | `http://localhost:7860/health` |
+
+## 一键安装
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yukkcat/gemini-business2api/main/deploy/install.sh | sudo bash
+```
+
+安装脚本会询问部署方式、服务端口、`ADMIN_KEY`、`DATABASE_URL` 以及是否启用 `refresh-worker`。
+
+## Refresh Worker
+
+需要账号刷新能力时，使用 Compose profile 启动：
+
+```bash
+docker compose --profile refresh up -d
+```
+
+`refresh-worker` 不提供业务 API，与主服务共享 `./data`。
+
+## 关键配置
+
+```dotenv
+ADMIN_KEY=your-admin-login-key
+# PORT=7860
+# DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
+# REFRESH_WORKER_IMAGE=cooooookk/gemini-refresh-worker:latest
+# REFRESH_HEALTH_PORT=8080
+```
+
+未设置 `DATABASE_URL` 时使用本地 SQLite；设置后可切换至 PostgreSQL。
+
+## API 接口
+
+| 接口 | 方法 | 说明 |
+| --- | --- | --- |
+| `/v1/models` | `GET` | 模型列表 |
+| `/v1/chat/completions` | `POST` | 对话补全 |
+| `/v1/images/generations` | `POST` | 图片生成 |
+| `/v1/images/edits` | `POST` | 图片编辑 |
+| `/health` | `GET` | 健康检查 |
+
+## 模型
+
+| 模型 ID | 文件多模态 | 图片生成 | 视频生成 |
+| --- | --- | --- | --- |
+| `gemini-auto` | 支持 | 可选 | - |
+| `gemini-2.5-pro` | 支持 | 可选 | - |
+| `gemini-3.5-flash` | 支持 | 可选 | - |
+| `gemini-3.1-pro-preview` | 支持 | 可选 | - |
+| `gemini-imagen` | 支持 | 支持 | - |
+| `gemini-veo` | 支持 | - | 支持 |
+
+实际可用模型以当前仓库版本和上游账号为准。
+
+## 许可证
+
+项目使用 [CNC-1.0 非商业许可证](https://github.com/yukkcat/gemini-business2api/blob/main/LICENSE)，部署或修改前请先确认许可范围。

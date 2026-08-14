@@ -1,0 +1,83 @@
+---
+title: Gemini Business2API
+description: Convert Gemini Business into an OpenAI-compatible API
+---
+
+[GitHub repository](https://github.com/yukkcat/gemini-business2api)
+
+Gemini Business2API provides multi-account scheduling, an administration console, and text, file, image, and video capabilities. The main branch contains only the 2API service and console; account refresh is available through the optional `refresh-worker`.
+
+## Docker Compose
+
+```bash
+git clone https://github.com/yukkcat/gemini-business2api.git
+cd gemini-business2api
+cp .env.example .env
+# Edit .env and set at least ADMIN_KEY
+docker compose up -d
+```
+
+SQLite is used by default, with persistent data stored in `./data`.
+
+| Entry | Address |
+| --- | --- |
+| Administration console | `http://localhost:7860/` |
+| OpenAI-compatible endpoint | `http://localhost:7860/v1/chat/completions` |
+| Health check | `http://localhost:7860/health` |
+
+## One-line installer
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yukkcat/gemini-business2api/main/deploy/install.sh | sudo bash
+```
+
+The installer asks for the deployment mode, service port, `ADMIN_KEY`, `DATABASE_URL`, and whether to enable `refresh-worker`.
+
+## Refresh Worker
+
+Start the Compose profile when account refresh is required:
+
+```bash
+docker compose --profile refresh up -d
+```
+
+The `refresh-worker` exposes no business API and shares `./data` with the main service.
+
+## Key configuration
+
+```dotenv
+ADMIN_KEY=your-admin-login-key
+# PORT=7860
+# DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
+# REFRESH_WORKER_IMAGE=cooooookk/gemini-refresh-worker:latest
+# REFRESH_HEALTH_PORT=8080
+```
+
+Local SQLite is used when `DATABASE_URL` is unset. Set it to switch to PostgreSQL.
+
+## API endpoints
+
+| Endpoint | Method | Description |
+| --- | --- | --- |
+| `/v1/models` | `GET` | Model list |
+| `/v1/chat/completions` | `POST` | Chat completions |
+| `/v1/images/generations` | `POST` | Image generation |
+| `/v1/images/edits` | `POST` | Image editing |
+| `/health` | `GET` | Health check |
+
+## Models
+
+| Model ID | File multimodality | Image generation | Video generation |
+| --- | --- | --- | --- |
+| `gemini-auto` | Yes | Optional | - |
+| `gemini-2.5-pro` | Yes | Optional | - |
+| `gemini-3.5-flash` | Yes | Optional | - |
+| `gemini-3.1-pro-preview` | Yes | Optional | - |
+| `gemini-imagen` | Yes | Yes | - |
+| `gemini-veo` | Yes | - | Yes |
+
+Available models depend on the current project version and upstream account.
+
+## License
+
+The project uses the [CNC-1.0 non-commercial license](https://github.com/yukkcat/gemini-business2api/blob/main/LICENSE). Review its terms before deploying or modifying the project.

@@ -9,7 +9,7 @@ import {
   BookOpenText,
   ImageIcon,
   MessageSquareText,
-  MonitorSmartphone,
+  Braces,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -53,12 +53,15 @@ const tabs: DocsSection[] = [
     icon: MessageSquareText,
   },
   {
-    title: { 'zh-CN': '客户端教程', en: 'Client Guides' },
-    description: { 'zh-CN': 'ChatGPT2API 项目', en: 'ChatGPT2API project' },
+    title: { 'zh-CN': '开源项目', en: 'Open Source' },
+    description: {
+      'zh-CN': 'ChatGPT2API 与 Gemini Business2API',
+      en: 'ChatGPT2API and Gemini Business2API',
+    },
     href: '/docs/client/chatgpt2api',
     prefix: '/docs/client',
-    paths: ['/docs/client/chatgpt2api'],
-    icon: MonitorSmartphone,
+    paths: ['/docs/client/chatgpt2api', '/docs/client/gemini-business2api'],
+    icon: Braces,
   },
 ];
 

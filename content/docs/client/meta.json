@@ -1,6 +1,6 @@
 {
-  "title": "客户端教程",
+  "title": "开源项目",
   "root": true,
   "defaultOpen": true,
-  "pages": ["chatgpt2api"]
+  "pages": ["chatgpt2api", "gemini-business2api"]
 }

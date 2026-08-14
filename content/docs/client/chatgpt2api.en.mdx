@@ -1,27 +1,84 @@
 ---
 title: ChatGPT2API
-description: An open-source OpenAI-compatible project for text models and GPT Image 2
+description: Expose ChatGPT web capabilities through an OpenAI-compatible API
 ---
 
-ChatGPT2API is a self-hosted OpenAI-compatible project with support for text models and GPT Image 2.
+[GitHub repository](https://github.com/yukkcat/chatgpt2api)
 
-## Project
+ChatGPT2API provides text, image, and file generation, multi-account management, and a web administration console.
 
-[View ChatGPT2API on GitHub](https://github.com/yukkcat/chatgpt2api)
+> This project connects to the ChatGPT website through reverse engineering and is not an official OpenAI service. Upstream changes can break the API or lead to account restrictions or bans. Do not use important accounts.
+
+## Docker Compose
 
 ```bash
 git clone https://github.com/yukkcat/chatgpt2api.git
+cd chatgpt2api
+cp .env.example .env
+# Edit .env and set a private CHATGPT2API_AUTH_KEY
+test -f config.json || printf '{}\n' > config.json
+docker compose up -d
 ```
 
-Refer to the project README for deployment, environment variables, and release notes.
+SQLite is used by default, so no separate database is required.
 
-## Use Klong API directly
+| Entry | Address |
+| --- | --- |
+| Administration console | `http://localhost:3000` |
+| OpenAI-compatible API | `http://localhost:3000/v1` |
+| Data directory | `./data` |
 
-If you do not need to self-host, enter the following values in your client:
+Do not commit your local `.env`, `config.json`, or `data/`.
 
-```text
-API URL: https://api.klong.lat
-API Key: the key created in the API Console
+## One-line installer
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yukkcat/chatgpt2api/main/deploy/install.sh | sudo bash
 ```
 
-[Open the API Console](https://api.klong.lat/) · [Buy Credits](https://pay.ldxp.cn/shop/yukkcat)
+The installer supports SQLite, a local PostgreSQL container, or an existing PostgreSQL URL.
+
+## PostgreSQL
+
+Start PostgreSQL 18 with Compose:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+```
+
+Connect to an existing PostgreSQL database:
+
+```dotenv
+DATABASE_URL=postgresql://user:password@host:5432/database
+```
+
+## API endpoints
+
+All AI endpoints use a Bearer key:
+
+```http
+Authorization: Bearer <auth-key>
+```
+
+| Endpoint | Method | Description |
+| --- | --- | --- |
+| `/v1/models` | `GET` | Model list |
+| `/v1/chat/completions` | `POST` | Chat Completions |
+| `/v1/responses` | `POST` | Responses API |
+| `/v1/messages` | `POST` | Anthropic Messages |
+| `/v1/images/generations` | `POST` | Image generation |
+| `/v1/images/edits` | `POST` | Image editing |
+
+## Key configuration
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `CHATGPT2API_AUTH_KEY` | Required | Administrator and default API key |
+| `DATABASE_URL` | SQLite | Database connection |
+| `CHATGPT2API_BASE_URL` | Current service URL | Public image and file URLs |
+
+Manage the remaining settings in the administration console. See the repository's [deployment guide](https://github.com/yukkcat/chatgpt2api/blob/main/docs/deployment.md) for upgrades, backups, and troubleshooting.
+
+## License
+
+The project is licensed under [AGPL-3.0](https://github.com/yukkcat/chatgpt2api/blob/main/LICENSE). If you modify it and provide it over a network, you must make the corresponding source available to service users as required by the license.

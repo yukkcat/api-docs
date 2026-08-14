@@ -1,6 +1,6 @@
 {
-  "title": "Client Guides",
+  "title": "Open Source",
   "root": true,
   "defaultOpen": true,
-  "pages": ["chatgpt2api"]
+  "pages": ["chatgpt2api", "gemini-business2api"]
 }

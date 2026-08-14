@@ -1,27 +1,84 @@
 ---
 title: ChatGPT2API
-description: 支持文本与 GPT Image 2 的 OpenAI 兼容开源项目
+description: 将 ChatGPT 官网能力接入 OpenAI 兼容 API
 ---
 
-ChatGPT2API 是独立部署的 OpenAI 兼容项目，支持文本模型与 GPT Image 2。
+[GitHub 仓库](https://github.com/yukkcat/chatgpt2api)
 
-## 项目地址
+ChatGPT2API 提供文本、图片、文件生成和多账号管理，并带有 Web 管理控制台。
 
-[在 GitHub 查看 ChatGPT2API](https://github.com/yukkcat/chatgpt2api)
+> 本项目通过逆向研究接入 ChatGPT 官网，并非 OpenAI 官方服务。接口可能随上游变化失效，也可能导致账号受限或封禁。请勿使用重要账号。
+
+## Docker Compose
 
 ```bash
 git clone https://github.com/yukkcat/chatgpt2api.git
+cd chatgpt2api
+cp .env.example .env
+# 编辑 .env，为 CHATGPT2API_AUTH_KEY 设置私有密钥
+test -f config.json || printf '{}\n' > config.json
+docker compose up -d
 ```
 
-部署方式、环境变量和更新记录以项目 README 为准。
+默认使用 SQLite，不需要单独安装数据库。
 
-## 直接使用 Klong API
+| 入口 | 地址 |
+| --- | --- |
+| 管理控制台 | `http://localhost:3000` |
+| OpenAI 兼容 API | `http://localhost:3000/v1` |
+| 数据目录 | `./data` |
 
-不需要自行部署时，直接在客户端填写：
+不要提交本地 `.env`、`config.json` 或 `data/`。
 
-```text
-API 地址：https://api.klong.lat
-API Key：控制台创建的密钥
+## 一键安装
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yukkcat/chatgpt2api/main/deploy/install.sh | sudo bash
 ```
 
-[打开 API 控制台](https://api.klong.lat/) · [购买额度](https://pay.ldxp.cn/shop/yukkcat)
+安装脚本可选择 SQLite、本地 PostgreSQL 容器或已有 PostgreSQL URL。
+
+## PostgreSQL
+
+使用 Compose 启动 PostgreSQL 18：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+```
+
+连接已有 PostgreSQL：
+
+```dotenv
+DATABASE_URL=postgresql://user:password@host:5432/database
+```
+
+## API 接口
+
+所有 AI 接口使用 Bearer Key：
+
+```http
+Authorization: Bearer <auth-key>
+```
+
+| 接口 | 方法 | 说明 |
+| --- | --- | --- |
+| `/v1/models` | `GET` | 模型列表 |
+| `/v1/chat/completions` | `POST` | Chat Completions |
+| `/v1/responses` | `POST` | Responses API |
+| `/v1/messages` | `POST` | Anthropic Messages |
+| `/v1/images/generations` | `POST` | 图片生成 |
+| `/v1/images/edits` | `POST` | 图片编辑 |
+
+## 关键配置
+
+| 配置 | 默认值 | 用途 |
+| --- | --- | --- |
+| `CHATGPT2API_AUTH_KEY` | 必填 | 管理员和默认 API Key |
+| `DATABASE_URL` | SQLite | 数据库连接 |
+| `CHATGPT2API_BASE_URL` | 当前服务地址 | 生成可公开访问的图片与文件 URL |
+
+其余设置通过管理控制台维护。升级、备份与排障以仓库的 [部署文档](https://github.com/yukkcat/chatgpt2api/blob/main/docs/deployment.md) 为准。
+
+## 许可证
+
+项目使用 [AGPL-3.0](https://github.com/yukkcat/chatgpt2api/blob/main/LICENSE)。修改后通过网络提供服务时，需要按许可证向服务用户提供对应源码。
