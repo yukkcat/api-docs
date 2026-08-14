@@ -1,7 +1,8 @@
 import { localizePath, type Locale } from '@/lib/i18n';
-import { apiConsoleUrl, brandLogoUrl, shopUrl } from '@/lib/shared';
+import { apiConsoleUrl, shopUrl } from '@/lib/shared';
 import {
   ArrowRight,
+  BookOpenText,
   Braces,
   ExternalLink,
   ImageIcon,
@@ -45,7 +46,7 @@ const copy = {
 }>;
 
 const sections = [
-  { href: '/docs/start/quick-start', icon: null },
+  { href: '/docs/start/quick-start', icon: BookOpenText },
   { href: '/docs/image/gpt-image-2', icon: ImageIcon },
   { href: '/docs/chat/chat-completions', icon: MessageSquareText },
   { href: '/docs/client/chatgpt2api', icon: Braces },
@@ -104,11 +105,7 @@ export default async function HomePage({ params }: PageProps<'/[lang]'>) {
               className="group flex min-h-32 items-start gap-4 rounded-lg border border-fd-border bg-fd-card p-5 transition-colors hover:border-fd-primary/45 hover:bg-fd-accent/55"
             >
               <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-fd-muted text-fd-primary">
-                {Icon ? (
-                  <Icon className="size-5" />
-                ) : (
-                  <img src={brandLogoUrl} alt="" aria-hidden="true" className="size-full object-cover" />
-                )}
+                <Icon className="size-5" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center justify-between gap-3 font-semibold text-fd-foreground">
