@@ -64,7 +64,7 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
 
 This configuration uses `postgres:18-alpine`, persists data in a named volume, and does not expose the database port by default. To use an existing PostgreSQL server, set:
 
-```env
+```dotenv
 DATABASE_URL=postgresql://user:password@host:5432/database
 ```
 

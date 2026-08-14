@@ -64,7 +64,7 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
 
 该模式使用 `postgres:18-alpine` 和命名卷持久化数据，默认不暴露数据库端口。连接已有 PostgreSQL 时直接设置：
 
-```env
+```dotenv
 DATABASE_URL=postgresql://user:password@host:5432/database
 ```
 
