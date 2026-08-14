@@ -32,6 +32,15 @@ bun run start
 
 新增页面后，把文件名同时加入对应语言的 `meta` 文件即可显示到侧边栏。
 
+## Docker
+
+推送到 `main` 后，GitHub Actions 会自动构建并发布 GHCR 镜像：
+
+```bash
+docker pull ghcr.io/yukkcat/api-docs:latest
+docker run -d --name api-docs -p 3000:3000 ghcr.io/yukkcat/api-docs:latest
+```
+
 ## 来源
 
 文档框架与布局基于 MIT 许可的 [Infinite Canvas 文档](https://github.com/basketikun/infinite-canvas/tree/main/docs)，许可文本见 `LICENSE`。
