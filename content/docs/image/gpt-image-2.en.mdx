@@ -37,7 +37,8 @@ All four models use the same generation and editing endpoints.
 | `size` | No | `widthxheight` in pixels, such as `1024x1024` or `3840x2160`; use a size supported by the model |
 | `quality` | No | `gpt-image-2-high` supports `medium` / `high`; `gpt-image-2-vip` is fixed to `medium` |
 | `n` | No | Number of images to generate; default: `1` |
-| `response_format` | No | `url` or `b64_json` |
+| `response_format` | No | `url` (default) or `b64_json` |
+| `stream` | No | With `true`, progress is sent over the current SSE connection |
 | `image` | For edits | Reference image file for `/edits`; repeat the field to upload multiple images |
 
 ## Quick start

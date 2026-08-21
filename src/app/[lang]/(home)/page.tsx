@@ -2,8 +2,6 @@ import { localizePath, type Locale } from '@/lib/i18n';
 import { apiConsoleUrl, shopUrl } from '@/lib/shared';
 import {
   ArrowRight,
-  BookOpenText,
-  Braces,
   ExternalLink,
   ImageIcon,
   MessageSquareText,
@@ -19,10 +17,8 @@ const copy = {
     console: 'API 控制台',
     shop: '购买额度',
     sections: [
-      ['快速开始', '获取 API Key，配置 Base URL，完成首次调用'],
       ['图像接口', 'GPT Image 2 与 Nano Banana 的生成和编辑调用'],
       ['对话接口', 'Chat Completions、Responses 与 Claude Messages'],
-      ['开源项目', 'ChatGPT2API 与 Gemini Business2API 部署文档'],
     ],
   },
   en: {
@@ -31,10 +27,8 @@ const copy = {
     console: 'API Console',
     shop: 'Buy Credits',
     sections: [
-      ['Quick Start', 'Get an API key, set the Base URL, and make your first request'],
       ['Image API', 'Generate and edit images with GPT Image 2 and Nano Banana'],
       ['Chat API', 'Chat Completions, Responses, and Claude Messages'],
-      ['Open Source', 'Deployment guides for ChatGPT2API and Gemini Business2API'],
     ],
   },
 } satisfies Record<Locale, {
@@ -46,10 +40,8 @@ const copy = {
 }>;
 
 const sections = [
-  { href: '/docs/start/quick-start', icon: BookOpenText },
   { href: '/docs/image/gpt-image-2', icon: ImageIcon },
   { href: '/docs/chat/chat-completions', icon: MessageSquareText },
-  { href: '/docs/client/chatgpt2api', icon: Braces },
 ] as const;
 
 export default async function HomePage({ params }: PageProps<'/[lang]'>) {

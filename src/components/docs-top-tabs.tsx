@@ -6,10 +6,8 @@ import { localizePath, type Locale } from '@/lib/i18n';
 import { SidebarTabsDropdown } from 'fumadocs-ui/components/sidebar/tabs/dropdown';
 import type { LayoutTab } from 'fumadocs-ui/layouts/shared';
 import {
-  BookOpenText,
   ImageIcon,
   MessageSquareText,
-  Braces,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -23,14 +21,6 @@ type DocsSection = {
 };
 
 const tabs: DocsSection[] = [
-  {
-    title: { 'zh-CN': '快速开始', en: 'Quick Start' },
-    description: { 'zh-CN': '地址、密钥与首次调用', en: 'Endpoint, API key, and first request' },
-    href: '/docs/start/quick-start',
-    prefix: '/docs/start',
-    paths: ['/docs/start/quick-start'],
-    icon: BookOpenText,
-  },
   {
     title: { 'zh-CN': '图像接口', en: 'Image API' },
     description: { 'zh-CN': 'GPT Image 与 Nano Banana', en: 'GPT Image and Nano Banana' },
@@ -51,17 +41,6 @@ const tabs: DocsSection[] = [
       '/docs/chat/models',
     ],
     icon: MessageSquareText,
-  },
-  {
-    title: { 'zh-CN': '开源项目', en: 'Open Source' },
-    description: {
-      'zh-CN': 'ChatGPT2API 与 Gemini Business2API',
-      en: 'ChatGPT2API and Gemini Business2API',
-    },
-    href: '/docs/client/chatgpt2api',
-    prefix: '/docs/client',
-    paths: ['/docs/client/chatgpt2api', '/docs/client/gemini-business2api'],
-    icon: Braces,
   },
 ];
 

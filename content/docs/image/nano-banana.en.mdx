@@ -28,13 +28,16 @@ Enterprise and standard models use the same native Gemini request format. Only r
 
 ## Parameters
 
-Set the aspect ratio and resolution under `generationConfig.responseFormat.image`:
+For compatibility with both native Gemini parameters and the current API, set the aspect ratio and resolution under both `generationConfig.imageConfig` and `generationConfig.responseFormat.image`, using identical values:
 
 | Parameter | Description |
 | --- | --- |
-| `responseFormat.image.aspectRatio` | Aspect ratio from the table below; omit it for image-to-image requests to follow the reference image automatically |
-| `responseFormat.image.imageSize` | `1K` / `2K` / `4K`; the K must be uppercase |
+| `imageConfig.aspectRatio` | Native Gemini aspect-ratio parameter; omit it for image-to-image requests to follow the reference image automatically |
+| `imageConfig.imageSize` | Native Gemini resolution parameter: `1K` / `2K` / `4K`; the K must be uppercase |
+| `responseFormat.image` | Compatibility parameter; copy the same `aspectRatio` and `imageSize` values here |
 | `responseModalities` | `['IMAGE']` returns base64, `['TEXT']` returns a URL, and `['IMAGE','TEXT']` returns both |
+
+> For 2K or 4K output, send both parameter groups. Sending only `responseFormat.image` may still produce the default 1K output—for example, 896x1200 at `3:4`.
 
 > Do not send `aspectRatio: "auto"`. Omit `aspectRatio` to use automatic sizing.
 
@@ -57,6 +60,32 @@ All four models support these ten common aspect ratios:
 
 Only the Flash family, `gemini-3.1-flash-image-preview` and `gemini-3.1-flash-image-preview-c`, supports ultra-wide and ultra-tall output: `8:1` = 2928x352, `4:1` = 2064x512, `1:4` = 512x2064, and `1:8` = 352x2928. Multiply each dimension by 2 or 4 for 2K or 4K.
 
+> The model can produce strong architecture, color, and composition, but long Chinese passages may still contain missing, incorrect, or reordered characters. Add body text in a design tool after generation instead of treating long text rendered inside an image as final copy.
+
+### Requesting 4K reliably
+
+This example uses `3:4`. Keep both parameter groups identical:
+
+```json
+{
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": {
+      "aspectRatio": "3:4",
+      "imageSize": "4K"
+    },
+    "responseFormat": {
+      "image": {
+        "aspectRatio": "3:4",
+        "imageSize": "4K"
+      }
+    }
+  }
+}
+```
+
+A `3:4` 4K result should be approximately 3584x4800. An actual result of 896x1200 means the request was still processed as 1K.
+
 ## Quick start
 
 <Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
@@ -73,6 +102,9 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:gen
     }],
     "generationConfig": {
       "responseModalities": ["IMAGE"],
+      "imageConfig": {
+        "aspectRatio": "1:1", "imageSize": "1K"
+      },
       "responseFormat": {
         "image": { "aspectRatio": "1:1", "imageSize": "1K" }
       }
@@ -98,6 +130,7 @@ payload = {
     }],
     "generationConfig": {
         "responseModalities": ["IMAGE"],
+        "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"},
         "responseFormat": {
             "image": {"aspectRatio": "1:1", "imageSize": "1K"},
         },
@@ -133,6 +166,7 @@ const response = await fetch(url, {
     }],
     generationConfig: {
       responseModalities: ["IMAGE"],
+      imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
       responseFormat: {
         image: { aspectRatio: "1:1", imageSize: "1K" },
       },
@@ -158,6 +192,7 @@ $payload = [
     ]],
     "generationConfig" => [
         "responseModalities" => ["IMAGE"],
+        "imageConfig" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
         "responseFormat" => [
             "image" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
         ],
@@ -192,7 +227,7 @@ import (
 )
 
 func main() {
-    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}`)
+    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"},"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}`)
     url := "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"
     req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
     req.Header.Set("x-goog-api-key", "<API_KEY>")
@@ -219,7 +254,7 @@ import java.net.http.HttpResponse;
 public class Main {
   public static void main(String[] args) throws Exception {
     String body = """
-      {"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}
+      {"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"},"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}
       """;
 
     HttpRequest request = HttpRequest.newBuilder()
@@ -260,6 +295,9 @@ var response = await client.PostAsJsonAsync(
         },
         generationConfig = new {
             responseModalities = new[] { "IMAGE" },
+            imageConfig = new {
+                aspectRatio = "1:1", imageSize = "1K"
+            },
             responseFormat = new {
                 image = new { aspectRatio = "1:1", imageSize = "1K" }
             }
@@ -321,12 +359,15 @@ Replace `inline_data` above with:
 
 ### Follow the reference ratio at 2K
 
-Pass only `imageSize` and omit `aspectRatio`:
+Set only `imageSize` in both locations and omit `aspectRatio`:
 
 ```json
 {
   "generationConfig": {
     "responseModalities": ["IMAGE"],
+    "imageConfig": {
+      "imageSize": "2K"
+    },
     "responseFormat": {
       "image": { "imageSize": "2K" }
     }

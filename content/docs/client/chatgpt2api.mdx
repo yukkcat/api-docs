@@ -1,115 +1,60 @@
 ---
-title: ChatGPT2API
-description: 将 ChatGPT 官网能力接入 OpenAI 兼容 API
+title: ChatGPT2API Go
+description: 自托管 ChatGPT Web 转发服务，支持兼容接口、账号池与异步图片任务
 ---
 
-将 ChatGPT 官网能力接入 OpenAI 兼容 API，并提供面向多账号、图片任务与自托管场景的管理控制台。
+ChatGPT2API Go 把 ChatGPT 网页端能力封装成可自托管的 API 服务，提供 OpenAI / Anthropic 兼容接口、账号池、图片管理、日志审计和 Web 管理面板。
 
-[GitHub 仓库](https://github.com/yukkcat/chatgpt2api) · [v3.2.2 Release](https://github.com/yukkcat/chatgpt2api/releases/tag/v3.2.2) · [更新说明](https://github.com/yukkcat/chatgpt2api/blob/main/CHANGELOG.md) · [维护文档](https://github.com/yukkcat/chatgpt2api/blob/main/docs/README.md)
+[GitHub 仓库](https://github.com/yukkcat/gpt2api-go) · [v1.4.2 Release](https://github.com/yukkcat/gpt2api-go/releases/tag/v1.4.2) · [更新日志](https://github.com/yukkcat/gpt2api-go/blob/main/CHANGELOG.md) · [README](https://github.com/yukkcat/gpt2api-go/blob/main/README.md)
 
-> **重要：** `v3.0.0` 是新的发布起点。远程 `main` 历史已重新整理，旧版本源代码、Git 标签、Release 和容器镜像不再作为当前发布线维护。3.0 使用全新的 Application Database，不能直接读取 2.x 的分散存储数据；升级时请重新配置或导入账号。
+> **风险提示：** 本项目通过技术研究访问 ChatGPT Web，并非 OpenAI 官方 API。上游接口和风控策略可能变化，也可能导致账号受限或封禁。请勿使用重要、常用或高价值账号，并遵守服务条款与适用法律。
 
-> **风险提示：** 本项目通过逆向研究接入 ChatGPT 官网的文本、图片和文件生成能力，并非 OpenAI 官方服务。接口可能随上游变化失效，并可能导致账号受限、临时或永久封禁；请勿使用重要、常用或高价值账号。
->
-> 使用者须自行了解技术、账号与合规风险，遵守 OpenAI 服务条款及当地法律法规。严禁用于批量滥用、恶意竞争、账号盗用、诈骗、骚扰，以及生成或传播违法、暴力、色情或涉及未成年人的内容；使用者自行承担全部风险与责任。
+## 当前实现
 
-- QQ 交流群：[1005859624](https://qm.qq.com/q/yegwCqJisS)
-- [购买生图账号](https://pay.ldxp.cn/shop/yukkcat)
-- [Klong 生图 API](https://api.klong.lat)
+本文已按 `yukkcat/gpt2api-go` 的 `v1.4.2` 源码同步。后端使用 Go，前端使用 Next.js，前端静态产物由 Go 服务直接托管。
+
+| 能力 | 当前实现 |
+| --- | --- |
+| 兼容接口 | Chat Completions、Responses、Anthropic Messages、图片生成与编辑 |
+| 多模态 | OpenAI 风格图片输入、参考图上传、轻量文本和 PDF 提取 |
+| 账号池 | 多账号选择、额度与状态、AT / RT、图片并发、失败与限流处理 |
+| 工具调用 | OpenAI `tool_calls`、Anthropic `tool_use`、Responses `function_call` |
+| 图片任务 | 同步响应、SSE 流式响应、PostgreSQL 持久化异步任务 |
+| 管理能力 | Web 面板、图片管理、调用日志、链路追踪和运行指标 |
 
 ## 快速部署
 
-### 一键安装
+### Docker
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yukkcat/chatgpt2api/main/deploy/install.sh | sudo bash
+git clone https://github.com/yukkcat/gpt2api-go.git
+cd gpt2api-go
+
+# 编辑 config.json，将 auth-key 改为自己的强密钥
+docker compose up -d --build
 ```
 
-安装时可选择 SQLite、本地 PostgreSQL 18 容器或已有 PostgreSQL URL。SQLite 无需额外配置；本地 PostgreSQL 由 Compose 自动启动并持久化。
+默认地址：
 
-固定安装 `v3.2.2`：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/yukkcat/chatgpt2api/v3.2.2/deploy/install.sh | sudo bash -s -- --branch v3.2.2
-```
-
-### Docker Compose
-
-默认使用 SQLite：
-
-```bash
-git clone https://github.com/yukkcat/chatgpt2api.git
-cd chatgpt2api
-cp .env.example .env
-# 编辑 .env，为 CHATGPT2API_AUTH_KEY 设置私有密钥
-test -f config.json || printf '{}\n' > config.json
-docker compose up -d
-```
-
-| 入口 | 地址 |
+| 用途 | 地址 |
 | --- | --- |
-| 管理控制台 | `http://localhost:3000` |
-| OpenAI 兼容 API | `http://localhost:3000/v1` |
-| 数据目录 | `./data` |
+| 管理面板 | `http://localhost:3000` |
+| API Base URL | `http://localhost:3000/v1` |
 
-`.env` 中的 `CHATGPT2API_AUTH_KEY` 优先于 `config.json` 的 `auth-key`。Compose 使用独立运行时卷支持控制台在线更新；控制台设置、账号、用户密钥、调用日志和指标写入 Application Database。不要提交本地 `.env`、`config.json` 或 `data/`。
-
-### PostgreSQL 18
-
-在 `.env` 中设置 `POSTGRES_PASSWORD`，再叠加 PostgreSQL Compose：
+也可以直接构建并运行单个容器：
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+docker build -t chatgpt2api-go .
+docker run --rm \
+  -p 3000:80 \
+  -v "$PWD/data:/app/data" \
+  -e CHATGPT2API_AUTH_KEY=<设置一个强密钥> \
+  chatgpt2api-go
 ```
 
-该模式使用 `postgres:18-alpine` 和命名卷持久化数据，默认不暴露数据库端口。连接已有 PostgreSQL 时直接设置：
+## API 接口
 
-```dotenv
-DATABASE_URL=postgresql://user:password@host:5432/database
-```
-
-完整的升级、备份、PostgreSQL 和故障排查说明见 [部署文档](https://github.com/yukkcat/chatgpt2api/blob/main/docs/deployment.md)。
-
-## 核心能力
-
-通用 UI 组件、主题和基础交互来自 [yukkcat/nanocat-ui](https://github.com/yukkcat/nanocat-ui)；本项目负责业务页面、后端状态投影和产品流程。
-
-| | 领域 | 能力 |
-| :---: | --- | --- |
-| 🔌 | API 网关 | Chat Completions、Responses、Messages、搜索、图片生成、图片编辑、PPT / PSD 与统一可编辑文件任务 |
-| 💬 | 对话画图 | 文本对话、联网搜索、文生图、图生图、多图参考、局部编辑、Markdown、代码高亮、引用来源和推理强度 |
-| 👥 | 账号管理 | 手动添加、OAuth、Access Token、Session JSON、CPA、远程 CPA、Sub2API 导入，以及搜索、筛选、分组、导出和批量处理 |
-| 🔑 | 凭证与额度 | 独立展示 AT / RT 状态，支持 RT 刷新 AT、同步套餐与额度、指定账号文本/画图测试和异常账号处置 |
-| ⚙️ | 调度与并发 | 多账号选择、账号处理并发、单账号图片并发、多图并行、失败换号、额度与限流状态管理 |
-| 🌐 | 代理出口 | 账号代理、账号组代理、多出口代理组、节点图片并发、轮换间隔、默认出口、备用出口和连通性检测 |
-| 📊 | 日志与监控 | 调用日志、活跃请求、最近完成、慢请求、账号切换、出口信息、图片阶段时间线和原始上游诊断 |
-| 🖼️ | 图片与文件 | 本地 / WebDAV 存储、图库、标签、缩略图、下载、ZIP、压缩、清理、PPT / PSD 产物和可选图片放大 |
-| ✨ | 提示词库 | 本地提示词资产、云端来源同步、分类选择和更新状态管理 |
-| 💾 | 数据与备份 | SQLite、PostgreSQL 18、R2 备份、保留策略，以及调用趋势、成功率和模型统计 |
-| 🖥️ | 管理控制台 | 概览、账号、代理、日志、实时监控、图片、对话画图和系统设置，适配桌面与移动端 |
-
-## 架构
-
-```mermaid
-flowchart LR
-  Client["兼容 API 客户端"] --> API["/v1 兼容 API"]
-  User["管理员 / Web 用户"] --> Console["Vue 管理控制台"]
-  API --> Services["业务服务"]
-  Console --> AdminAPI["/api 管理接口"]
-  AdminAPI --> Services
-  Services --> Scheduler["账号调度与代理出口"]
-  Scheduler --> Upstream["ChatGPT Web"]
-  Services --> AppDB["Application Database<br/>SQLite / PostgreSQL 18"]
-  Services --> Assets["图片与生成文件<br/>本地 / WebDAV"]
-  Services --> Monitor["进程内实时监控"]
-  Services --> Backup["R2 备份"]
-```
-
-Application Database 保存账号、用户密钥、设置、日志和指标；图片与生成文件使用独立文件存储。详见 [存储架构](https://github.com/yukkcat/chatgpt2api/blob/main/docs/storage-architecture.md)。
-
-## API
-
-所有 AI 接口使用 Bearer Key：
+所有 AI 接口都使用 Bearer Key：
 
 ```http
 Authorization: Bearer <auth-key>
@@ -117,106 +62,172 @@ Authorization: Bearer <auth-key>
 
 | 接口 | 方法 | 说明 |
 | --- | --- | --- |
-| `/v1/models` | `GET` | 返回本地目录与上游实时模型合并后的模型列表 |
-| `/v1/chat/completions` | `POST` | 文本、搜索和图片场景的 Chat Completions 入口 |
-| `/v1/responses` | `POST` | 支持文本、搜索和图片工具调用的 Responses 入口 |
+| `/v1/models` | `GET` | 查询当前可用模型 |
+| `/v1/chat/completions` | `POST` | OpenAI Chat Completions 兼容入口 |
+| `/v1/responses` | `POST` | OpenAI Responses 兼容入口 |
 | `/v1/messages` | `POST` | Anthropic Messages 兼容入口 |
-| `/v1/search` | `POST` | 返回回答、引用来源和搜索结果 |
-| `/v1/images/generations` | `POST` | 图片生成，支持 `n=1..4` |
-| `/v1/images/edits` | `POST` | multipart、远程 URL、base64、data URL 和多参考图编辑 |
-| `/v1/editable-file-tasks` | `GET / POST` | 创建与查询 PPT / PSD 可编辑文件任务 |
-| `/v1/editable-file-tasks/{task_id}` | `DELETE` | 删除当前密钥所属任务 |
-| `/v1/ppt/generations` | `POST` | PPT 任务快捷入口 |
-| `/v1/psd/generations` | `POST` | PSD 任务快捷入口 |
-| `/files/{file_path}` | `GET` | 公开下载随机存储路径下的生成文件 |
+| `/v1/images/generations` | `POST` | 图片生成；也可提交或查询异步任务 |
+| `/v1/images/edits` | `POST` | 图片编辑；支持多张参考图和异步任务 |
+| `/v1/images/tasks/{task_id}` | `GET` | 查询并领取当前密钥所属的异步图片任务 |
+| `/v1/images/tasks/{task_id}/results/{position}` | `GET` | 下载已经领取的异步图片结果 |
 
-文件任务的创建、查询和删除按 API Key 隔离；任务返回的 `/files/...` 链接与生成图片一样无需鉴权，持有链接即可下载。公开下载会校验路径及文件类型，拒绝路径穿越。
-
-<details>
-<summary>Chat Completions 示例</summary>
+### 文本示例
 
 ```bash
 curl http://localhost:3000/v1/chat/completions \
-  -H "Content-Type: application/json" \
   -H "Authorization: Bearer <auth-key>" \
-  -d '{"model":"gpt-5","messages":[{"role":"user","content":"介绍一下这个项目"}],"stream":true}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "messages": [{"role":"user","content":"介绍一下这个项目"}],
+    "stream": true
+  }'
 ```
 
-</details>
-
-<details>
-<summary>图片生成示例</summary>
+### 同步图片示例
 
 ```bash
 curl http://localhost:3000/v1/images/generations \
-  -H "Content-Type: application/json" \
   -H "Authorization: Bearer <auth-key>" \
-  -d '{"model":"gpt-image-2","prompt":"一只漂浮在太空里的猫，电影感光影","n":1,"response_format":"b64_json"}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "一只漂浮在太空里的猫，电影感光影",
+    "n": 1
+  }'
 ```
 
-</details>
+## 异步图片任务
 
-实际可用模型以上游账号和 `/v1/models` 返回值为准。
+异步能力已经在源码中实现。它不是一个新模型，也不是 `stream: true`：客户端提交原来的图片请求并加入 `async: true`，服务立即返回任务 ID，再由后台 Worker 处理。
 
-## 关键配置
+```text
+提交 async=true → 返回 202 和 task_id → 后台生成 → 轮询任务 → 领取结果
+```
 
-| 配置 | 默认值 | 用途 |
+### 服务端启用条件
+
+异步任务默认关闭，必须同时满足：
+
+1. 账号池存储使用 PostgreSQL：`STORAGE_BACKEND=postgres`。
+2. 设置 `DATABASE_URL` 和 `CHATGPT2API_ACCOUNT_ENCRYPTION_KEY`。
+3. 设置 `CHATGPT2API_ASYNC_IMAGES_ENABLED=true`。
+4. 在 `CHATGPT2API_ASYNC_IMAGE_ALLOWED_SUBJECTS` 中明确加入允许提交任务的 User Key `subject_id`；管理员根密钥对应 `admin`。
+5. 多实例运行时，所有 Worker 共同挂载同一个 `CHATGPT2API_ASYNC_IMAGE_ASSET_ROOT`。
+
+### 提交任务
+
+```bash
+curl http://localhost:3000/v1/images/generations \
+  -H "Authorization: Bearer <auth-key>" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: stable-request-id" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "一只漂浮在太空里的猫",
+    "async": true
+  }'
+```
+
+服务返回 HTTP `202`，并通过响应体、`Location` 和 `Retry-After` 告诉客户端如何查询：
+
+```json
+{
+  "id": "img_...",
+  "object": "image.task",
+  "status": "queued",
+  "mode": "generation",
+  "model": "gpt-image-2",
+  "created_at": 1787190000,
+  "expires_at": 1787193600,
+  "poll_url": "/v1/images/tasks/img_...?model=gpt-image-2",
+  "retry_after_seconds": 4
+}
+```
+
+`Idempotency-Key` 可避免客户端超时重试时重复创建任务，也可以在请求体中使用同值的 `idempotency_key`。请求头和请求体同时提供时，两者必须一致。
+
+### 查询并领取结果
+
+```bash
+curl "http://localhost:3000/v1/images/tasks/<task_id>?model=gpt-image-2" \
+  -H "Authorization: Bearer <auth-key>"
+```
+
+查询必须使用**提交任务时的同一个 API Key 和同一个 `model`**。任务状态包括：
+
+| 状态 | 含义 |
+| --- | --- |
+| `queued` | 已进入队列，等待 Worker |
+| `running` | Worker 正在调用上游 |
+| `succeeded` | 已生成，可领取结果 |
+| `failed` | 任务失败，返回 OpenAI 风格错误 |
+
+首次成功领取返回 HTTP `200` 和 `data[]`：
+
+```json
+{
+  "id": "img_...",
+  "object": "image.task",
+  "status": "succeeded",
+  "model": "gpt-image-2",
+  "data": [{"url":"/v1/images/tasks/img_.../results/0?model=gpt-image-2","revised_prompt":"..."}],
+  "usage": {"total_tokens": 123}
+}
+```
+
+省略 `response_format` 或传入 `url` 时返回下载地址；显式传入 `b64_json` 时直接返回 Base64。
+
+> **只有 `data[]` 成功领取一次，图片并非只能下载一次。** 再次查询同一任务会返回 `404`，避免下游重复结算；URL 可在任务过期前使用相同的 Bearer Key 重复下载。
+
+```bash
+curl -L \
+  -H "Authorization: Bearer <auth-key>" \
+  "http://localhost:3000/v1/images/tasks/<task_id>/results/0?model=gpt-image-2" \
+  -o image.png
+```
+
+如果网关不便转发 GET，也可通过原图片接口查询。等待中会返回 HTTP `202`，成功时返回 HTTP `200`：
+
+```bash
+curl http://localhost:3000/v1/images/generations \
+  -H "Authorization: Bearer <auth-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-image-2","task_id":"img_..."}'
+```
+
+图片编辑同样支持异步：在 `/v1/images/edits` 的 multipart 请求中加入 `-F "async=true"`。`async: true` 与 `stream: true` 不能同时使用。
+
+## 异步任务配置
+
+| 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `CHATGPT2API_AUTH_KEY` | 必填 | 管理员和默认 API Key，环境变量优先于 `config.json` |
-| `DATABASE_URL` | SQLite | Application Database 连接；未设置时使用 `data/chatgpt2api.db` |
-| `CHATGPT2API_BASE_URL` | 当前服务地址 | 生成对外可访问的图片和文件 URL |
-| `CHATGPT2API_THREAD_TOKENS` | `120` | 后端同步工作线程并发容量，只要求正整数且不设固定最高值；账号、代理和上游仍有各自并发限制 |
-| `account_processing_concurrency` | `30` | 账号导入、刷新、同步和批量处理容量 |
-| `image_account_concurrency` | `1` | 单账号图片并发上限，可设置为 1–3 |
-| `image_stream_timeout_secs` | `80` | 图片上游 SSE / HTTP 流最长等待时间 |
-| `image_poll_timeout_secs` | `60` | 图片结果解析与轮询最长等待时间 |
-| `log_retention_hours` | `24` | 调用日志自动保留小时数 |
-
-其余设置通过控制台维护。配置项的权威默认值与约束以当前接口投影为准。
+| `CHATGPT2API_ASYNC_IMAGES_ENABLED` | `false` | 是否启用异步图片任务；仅支持 PostgreSQL |
+| `CHATGPT2API_ASYNC_IMAGE_ALLOWED_SUBJECTS` | 空 | 允许提交任务的 `subject_id` 白名单；空值拒绝全部 |
+| `CHATGPT2API_ASYNC_IMAGE_WORKERS` | `8` | 后台 Worker 数，范围 1–64 |
+| `CHATGPT2API_ASYNC_IMAGE_QUEUE_CAPACITY` | `64` | 全局未完成任务上限 |
+| `CHATGPT2API_ASYNC_IMAGE_OWNER_OUTSTANDING` | `8` | 单个 User Key 未完成任务上限 |
+| `CHATGPT2API_ASYNC_IMAGE_OWNER_SUBMISSIONS_PER_MINUTE` | `30` | 单个 User Key 每分钟提交上限 |
+| `CHATGPT2API_ASYNC_IMAGE_RESULT_TTL_MINUTES` | `60` | 未领取结果保留时间，最长 7 天 |
+| `CHATGPT2API_ASYNC_IMAGE_MAX_STORED_BYTES` | `10 GiB` | 未领取结果的全局存储上限 |
+| `CHATGPT2API_ASYNC_IMAGE_ASSET_ROOT` | `data/image-jobs` | 异步输入与结果文件目录 |
 
 ## 本地开发
 
-```bash
-# 后端：Python 3.13 + uv
-uv sync
-uv run main.py
+Go 版本以仓库 `go.mod` 为准：
 
-# 前端：Node.js + npm
-cd web-vue
-npm install
-npm run dev
+```bash
+go test ./...
+make run
 ```
 
-默认开发地址为 `http://localhost:5173`，后端接口由 Vite 开发代理转发。
+重新构建 Web 面板后运行：
 
-## 文档
-
-| 文档 | 内容 |
-| --- | --- |
-| [文档索引](https://github.com/yukkcat/chatgpt2api/blob/main/docs/README.md) | 当前架构与维护文档入口 |
-| [部署与运维](https://github.com/yukkcat/chatgpt2api/blob/main/docs/deployment.md) | Docker、PostgreSQL、升级、备份与排障 |
-| [存储架构](https://github.com/yukkcat/chatgpt2api/blob/main/docs/storage-architecture.md) | Application Database 与文件存储边界 |
-| [控制台架构](https://github.com/yukkcat/chatgpt2api/blob/main/docs/control-panel-architecture.md) | 前后端职责、业务投影与交互状态 |
-| [图片失败处理](https://github.com/yukkcat/chatgpt2api/blob/main/docs/image-failure-handling.md) | 图片失败分类、重试与账号处置 |
-| [上游 SSE](https://github.com/yukkcat/chatgpt2api/blob/main/docs/upstream-sse-conversation.md) | 会话与流式解析边界 |
-
-文档与实现冲突时，以当前代码、测试和公开接口契约为准。
+```bash
+make web
+make run
+```
 
 ## 许可证
 
-本仓库当前版本以 [GNU Affero General Public License v3.0](https://github.com/yukkcat/chatgpt2api/blob/main/LICENSE)（`AGPL-3.0-only`）发布。修改后通过网络提供服务时，须按协议向服务用户提供对应源码。
-
-源自 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) 的代码继续保留原 MIT 版权与许可声明，详见 [NOTICE](https://github.com/yukkcat/chatgpt2api/blob/main/NOTICE)。此前已按 MIT 发布的版本仍适用其原许可证。
-
-## 本项目贡献者
-
-[查看 ChatGPT2API 贡献者](https://github.com/yukkcat/chatgpt2api/graphs/contributors)。
-
-## 原版项目与贡献者
-
-本项目基于 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) 演进，感谢原项目作者与所有贡献者。[查看原版项目贡献者](https://github.com/basketikun/chatgpt2api/graphs/contributors)。
-
-## 社区与友链
-
-- QQ 交流群：[1005859624](https://qm.qq.com/q/yegwCqJisS)
-- 社区：[Linux.do](https://linux.do)
+项目使用 [GNU AGPL v3.0](https://github.com/yukkcat/gpt2api-go/blob/main/LICENSE)。修改后通过网络向用户提供服务时，需要按许可证要求提供对应源码。

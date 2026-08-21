@@ -37,7 +37,8 @@ Authorization: Bearer <API_KEY>
 | `size` | 否 | `宽x高` 像素，如 `1024x1024`、`3840x2160`；按模型支持填写 |
 | `quality` | 否 | `gpt-image-2-high` 支持 `medium` / `high`；`gpt-image-2-vip` 固定为 `medium` |
 | `n` | 否 | 一次出几张，默认 `1` |
-| `response_format` | 否 | `url` 或 `b64_json` |
+| `response_format` | 否 | `url`（默认）或 `b64_json` |
+| `stream` | 否 | `true` 时通过当前 SSE 连接持续返回进度 |
 | `image` | 编辑必填 | 仅 `/edits`：参考图文件，可重复传入多张 |
 
 ## 快速调用

@@ -6,12 +6,14 @@ import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
 export const docs = defineDocs({
   dir: 'content/docs',
   docs: {
+    files: ['image/**/*.mdx', 'chat/**/*.mdx'],
     schema: pageSchema,
     postprocess: {
       includeProcessedMarkdown: true,
     },
   },
   meta: {
+    files: ['meta*.json', 'image/meta*.json', 'chat/meta*.json'],
     schema: metaSchema,
   },
 });

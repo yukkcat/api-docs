@@ -28,13 +28,16 @@ Content-Type: application/json
 
 ## 参数
 
-比例和分辨率使用 `generationConfig.responseFormat.image`：
+为了兼容 Gemini 原生参数和当前接口，比例与分辨率建议同时填写在 `generationConfig.imageConfig` 和 `generationConfig.responseFormat.image`，两处值保持一致：
 
 | 参数 | 说明 |
 | --- | --- |
-| `responseFormat.image.aspectRatio` | 比例，见下表；图生图省略时根据参考图自动决定 |
-| `responseFormat.image.imageSize` | 分辨率 `1K` / `2K` / `4K`，K 必须大写 |
+| `imageConfig.aspectRatio` | Gemini 原生比例参数，见下表；图生图省略时根据参考图自动决定 |
+| `imageConfig.imageSize` | Gemini 原生分辨率参数：`1K` / `2K` / `4K`，K 必须大写 |
+| `responseFormat.image` | 接口兼容参数；复制相同的 `aspectRatio` 和 `imageSize` |
 | `responseModalities` | `["IMAGE"]` 返回 base64、`["TEXT"]` 返回 URL、`["IMAGE","TEXT"]` 两者都返回 |
+
+> 请求 2K / 4K 时请同时传两组参数。只传 `responseFormat.image` 可能仍按默认 1K 生成，例如 `3:4` 只得到 896×1200。
 
 > 自动比例不要传 `aspectRatio: "auto"`，正确写法是省略 `aspectRatio`。
 
@@ -57,6 +60,32 @@ Content-Type: application/json
 
 超宽长条仅 Flash 系列 `gemini-3.1-flash-image-preview` 与 `gemini-3.1-flash-image-preview-c` 支持：`8:1` = 2928×352、`4:1` = 2064×512、`1:4` = 512×2064、`1:8` = 352×2928，2K / 4K 对应放大 2 / 4 倍。
 
+> 模型适合生成建筑、色彩和构图，但长段中文仍可能出现错字、漏字或顺序错误。正文排版建议在生成图片后使用设计软件添加，不要把图片中的长文本直接作为最终文稿。
+
+### 稳定请求 4K
+
+下面以 `3:4` 为例。两组尺寸参数必须一致：
+
+```json
+{
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": {
+      "aspectRatio": "3:4",
+      "imageSize": "4K"
+    },
+    "responseFormat": {
+      "image": {
+        "aspectRatio": "3:4",
+        "imageSize": "4K"
+      }
+    }
+  }
+}
+```
+
+`3:4` 的 4K 结果应为约 3584×4800；如果实际只有 896×1200，说明请求仍按 1K 处理。
+
 ## 快速调用
 
 <Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
@@ -73,6 +102,9 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:gen
     }],
     "generationConfig": {
       "responseModalities": ["IMAGE"],
+      "imageConfig": {
+        "aspectRatio": "1:1", "imageSize": "1K"
+      },
       "responseFormat": {
         "image": { "aspectRatio": "1:1", "imageSize": "1K" }
       }
@@ -98,6 +130,7 @@ payload = {
     }],
     "generationConfig": {
         "responseModalities": ["IMAGE"],
+        "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"},
         "responseFormat": {
             "image": {"aspectRatio": "1:1", "imageSize": "1K"},
         },
@@ -133,6 +166,7 @@ const response = await fetch(url, {
     }],
     generationConfig: {
       responseModalities: ["IMAGE"],
+      imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
       responseFormat: {
         image: { aspectRatio: "1:1", imageSize: "1K" },
       },
@@ -156,6 +190,7 @@ $payload = [
     ]],
     "generationConfig" => [
         "responseModalities" => ["IMAGE"],
+        "imageConfig" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
         "responseFormat" => [
             "image" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
         ],
@@ -190,7 +225,7 @@ import (
 )
 
 func main() {
-    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}`)
+    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"},"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}`)
     url := "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"
     req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
     req.Header.Set("x-goog-api-key", "<API_KEY>")
@@ -217,7 +252,7 @@ import java.net.http.HttpResponse;
 public class Main {
   public static void main(String[] args) throws Exception {
     String body = """
-      {"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}
+      {"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"},"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}
       """;
 
     HttpRequest request = HttpRequest.newBuilder()
@@ -256,6 +291,9 @@ var response = await client.PostAsJsonAsync(
         },
         generationConfig = new {
             responseModalities = new[] { "IMAGE" },
+            imageConfig = new {
+                aspectRatio = "1:1", imageSize = "1K"
+            },
             responseFormat = new {
                 image = new { aspectRatio = "1:1", imageSize = "1K" }
             }
@@ -317,12 +355,15 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:gen
 
 ### 图生图自动跟随参考图比例，并固定 2K
 
-只传 `imageSize`，省略 `aspectRatio`：
+两处都只传 `imageSize`，省略 `aspectRatio`：
 
 ```json
 {
   "generationConfig": {
     "responseModalities": ["IMAGE"],
+    "imageConfig": {
+      "imageSize": "2K"
+    },
     "responseFormat": {
       "image": { "imageSize": "2K" }
     }

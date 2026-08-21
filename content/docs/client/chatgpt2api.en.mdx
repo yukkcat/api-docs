@@ -1,117 +1,58 @@
 ---
-title: ChatGPT2API
-description: Expose ChatGPT Web capabilities through OpenAI-compatible APIs
+title: ChatGPT2API Go
+description: A self-hosted ChatGPT Web gateway with compatible APIs, account pooling, and durable async image jobs
 ---
 
-Expose supported ChatGPT Web capabilities through OpenAI-compatible APIs, with a self-hosted console for multi-account orchestration and image workflows.
+ChatGPT2API Go wraps ChatGPT Web capabilities in a self-hosted API service. It provides OpenAI- and Anthropic-compatible endpoints, account pooling, image management, audit logs, and a web console.
 
-[GitHub repository](https://github.com/yukkcat/chatgpt2api) · [v3.2.2 Release](https://github.com/yukkcat/chatgpt2api/releases/tag/v3.2.2) · [Changelog](https://github.com/yukkcat/chatgpt2api/blob/main/CHANGELOG.md) · [Documentation](https://github.com/yukkcat/chatgpt2api/blob/main/docs/README.md)
+[GitHub repository](https://github.com/yukkcat/gpt2api-go) · [v1.4.2 Release](https://github.com/yukkcat/gpt2api-go/releases/tag/v1.4.2) · [Changelog](https://github.com/yukkcat/gpt2api-go/blob/main/CHANGELOG.md) · [README](https://github.com/yukkcat/gpt2api-go/blob/main/README.md)
 
-> **Important:** `v3.0.0` is a new release baseline. The remote `main` history has been consolidated, and older source history, Git tags, releases, and container images are no longer maintained as part of the current release line. Version 3.0 uses a new Application Database and cannot read the distributed storage used by 2.x directly. Reconfigure the service or re-import accounts after upgrading.
+> **Risk notice:** This project accesses ChatGPT Web for technical research and is not an official OpenAI API. Upstream interfaces and risk controls can change and may restrict or ban accounts. Do not use important, frequently used, or high-value accounts. Follow the applicable terms and laws.
 
-> **Warning:** This project accesses ChatGPT Web text, image, and file-generation capabilities through reverse engineering and is not an official OpenAI service. Upstream changes may break these interfaces or cause account restrictions and temporary or permanent bans; do not use important, frequently used, or high-value accounts.
->
-> Users must understand the technical, account, and compliance risks and comply with OpenAI's terms and applicable laws. Bulk abuse, malicious competition, account theft, fraud, harassment, and the generation or distribution of illegal, violent, sexual, or minor-related content are strictly prohibited. Users assume all risks and consequences.
+## Current implementation
 
-- QQ group: [1005859624](https://qm.qq.com/q/yegwCqJisS)
-- [Buy image-generation accounts](https://pay.ldxp.cn/shop/yukkcat)
-- [Klong image API](https://api.klong.lat)
+This page has been synchronized with the `yukkcat/gpt2api-go` `v1.4.2` source. The backend is written in Go, the console uses Next.js, and the compiled frontend is served directly by the Go service.
 
-## Quick Start
+| Area | Current implementation |
+| --- | --- |
+| Compatible APIs | Chat Completions, Responses, Anthropic Messages, image generation, and image editing |
+| Multimodal input | OpenAI-style image input, reference-image upload, and lightweight text/PDF extraction |
+| Account pool | Multi-account selection, quota and state tracking, AT/RT handling, image concurrency, failures, and rate limits |
+| Tool calls | OpenAI `tool_calls`, Anthropic `tool_use`, and Responses `function_call` |
+| Image workflows | Synchronous responses, SSE streaming, and PostgreSQL-backed durable async jobs |
+| Administration | Web console, image management, call logs, request tracing, and runtime metrics |
 
-### One-click installer
+## Quick deployment
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/yukkcat/chatgpt2api/main/deploy/install.sh | sudo bash
-```
-
-The installer lets you choose SQLite, a local PostgreSQL 18 container, or an existing PostgreSQL URL. SQLite requires no additional service. Local PostgreSQL is started and persisted automatically through Compose.
-
-To install the fixed `v3.2.2` release:
+### Docker
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yukkcat/chatgpt2api/v3.2.2/deploy/install.sh | sudo bash -s -- --branch v3.2.2
+git clone https://github.com/yukkcat/gpt2api-go.git
+cd gpt2api-go
+
+# Edit config.json and replace auth-key with your own strong secret
+docker compose up -d --build
 ```
 
-### Docker Compose
+Default addresses:
 
-SQLite is used by default:
-
-```bash
-git clone https://github.com/yukkcat/chatgpt2api.git
-cd chatgpt2api
-cp .env.example .env
-# Edit .env and set a private CHATGPT2API_AUTH_KEY
-test -f config.json || printf '{}\n' > config.json
-docker compose up -d
-```
-
-| Endpoint | Address |
+| Purpose | Address |
 | --- | --- |
 | Admin console | `http://localhost:3000` |
-| OpenAI-compatible API | `http://localhost:3000/v1` |
-| Data directory | `./data` |
+| API Base URL | `http://localhost:3000/v1` |
 
-`CHATGPT2API_AUTH_KEY` in `.env` takes precedence over `auth-key` in `config.json`. Compose uses a dedicated runtime volume for console-managed online updates. Console settings, upstream accounts, user keys, call records, and metrics are stored in the Application Database. Do not commit local `.env`, `config.json`, or `data/` files.
-
-### PostgreSQL 18
-
-Set `POSTGRES_PASSWORD` in `.env`, then layer the PostgreSQL Compose file over the base stack:
+You can also build and run a single container:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+docker build -t chatgpt2api-go .
+docker run --rm \
+  -p 3000:80 \
+  -v "$PWD/data:/app/data" \
+  -e CHATGPT2API_AUTH_KEY=<set-a-strong-secret> \
+  chatgpt2api-go
 ```
 
-This configuration uses `postgres:18-alpine`, persists data in a named volume, and does not expose the database port by default. To use an existing PostgreSQL server, set:
-
-```dotenv
-DATABASE_URL=postgresql://user:password@host:5432/database
-```
-
-See the [deployment guide](https://github.com/yukkcat/chatgpt2api/blob/main/docs/deployment.md) for upgrades, backups, PostgreSQL setup, and troubleshooting.
-
-## Project Scope
-
-ChatGPT2API is continuously developed from [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api). It uses the ChatGPT Web protocol to expose the OpenAI-compatible interfaces implemented by this project.
-
-## Capabilities
-
-Shared UI components, themes, and interaction primitives come from [yukkcat/nanocat-ui](https://github.com/yukkcat/nanocat-ui). This repository owns the product pages, backend state projections, and domain workflows.
-
-| | Area | Capabilities |
-| :---: | --- | --- |
-| 🔌 | API gateway | Chat Completions, Responses, Messages, search, image generation and editing, PPT/PSD generation, and unified editable-file tasks |
-| 💬 | Chat and image studio | Text chat, web search, text-to-image, image-to-image, multiple references, local editing, Markdown, syntax highlighting, citations, and reasoning effort |
-| 👥 | Account management | Manual, OAuth, Access Token, Session JSON, CPA, remote CPA, and Sub2API imports, plus search, filters, groups, exports, and batch actions |
-| 🔑 | Credentials and quotas | Separate AT/RT states, RT-based AT renewal, plan and quota synchronization, pinned-account text/image tests, and invalid-account handling |
-| ⚙️ | Scheduling and concurrency | Multi-account selection, account-processing concurrency, per-account image concurrency, parallel images, account switching, quotas, and rate-limit state |
-| 🌐 | Proxy egress | Account and account-group proxies, multi-egress proxy groups, per-node image concurrency, rotation, default and fallback egress, and connectivity checks |
-| 📊 | Logs and monitoring | Persisted call records, active requests, recent and slow requests, account switches, egress details, image stage timelines, and raw upstream diagnostics |
-| 🖼️ | Images and files | Local/WebDAV storage, gallery, tags, thumbnails, downloads, ZIP archives, compression, cleanup, PPT/PSD artifacts, and optional image upscaling |
-| ✨ | Prompt library | Local prompt assets, cloud-source synchronization, categorized selection, and source health |
-| 💾 | Data and backups | SQLite, PostgreSQL 18, R2 backups, retention policies, request trends, success rates, and model metrics |
-| 🖥️ | Admin console | Dashboard, accounts, proxies, logs, real-time monitoring, gallery, chat and image studio, and settings on desktop and mobile |
-
-## Architecture
-
-```mermaid
-flowchart LR
-  Client["Compatible API client"] --> API["/v1 compatible API"]
-  User["Administrator / web user"] --> Console["Vue admin console"]
-  API --> Services["Domain services"]
-  Console --> AdminAPI["/api admin endpoints"]
-  AdminAPI --> Services
-  Services --> Scheduler["Account scheduling and proxy egress"]
-  Scheduler --> Upstream["ChatGPT Web"]
-  Services --> AppDB["Application Database<br/>SQLite / PostgreSQL 18"]
-  Services --> Assets["Images and generated files<br/>Local / WebDAV"]
-  Services --> Monitor["In-process real-time monitor"]
-  Services --> Backup["R2 backup"]
-```
-
-The Application Database stores accounts, user keys, settings, call records, and metrics. Images and generated files remain in dedicated file storage. See the [storage architecture](https://github.com/yukkcat/chatgpt2api/blob/main/docs/storage-architecture.md) for ownership boundaries.
-
-## API
+## API endpoints
 
 All AI endpoints use a Bearer key:
 
@@ -121,106 +62,172 @@ Authorization: Bearer <auth-key>
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
-| `/v1/models` | `GET` | Returns the merged local and live upstream model catalog |
-| `/v1/chat/completions` | `POST` | Chat Completions entry point for text, search, and image scenarios |
-| `/v1/responses` | `POST` | Responses entry point with text, search, and image tools |
-| `/v1/messages` | `POST` | Anthropic Messages-compatible entry point |
-| `/v1/search` | `POST` | Returns an answer, citations, and search results |
-| `/v1/images/generations` | `POST` | Image generation with `n=1..4` |
-| `/v1/images/edits` | `POST` | Image editing from multipart files, remote URLs, base64, data URLs, or multiple references |
-| `/v1/editable-file-tasks` | `GET / POST` | Creates and queries editable PPT/PSD tasks |
-| `/v1/editable-file-tasks/{task_id}` | `DELETE` | Deletes a task owned by the current key |
-| `/v1/ppt/generations` | `POST` | PPT task shortcut |
-| `/v1/psd/generations` | `POST` | PSD task shortcut |
-| `/files/{file_path}` | `GET` | Publicly downloads a generated file from its random storage path |
+| `/v1/models` | `GET` | Lists the currently available models |
+| `/v1/chat/completions` | `POST` | OpenAI Chat Completions-compatible endpoint |
+| `/v1/responses` | `POST` | OpenAI Responses-compatible endpoint |
+| `/v1/messages` | `POST` | Anthropic Messages-compatible endpoint |
+| `/v1/images/generations` | `POST` | Image generation; also submits or queries async jobs |
+| `/v1/images/edits` | `POST` | Image editing with multiple references and async support |
+| `/v1/images/tasks/{task_id}` | `GET` | Polls and claims an async image job owned by the current key |
+| `/v1/images/tasks/{task_id}/results/{position}` | `GET` | Downloads a claimed async image result |
 
-Creating, querying, and deleting file tasks is isolated by API key. The `/files/...` links returned by successful tasks work like generated-image links: anyone holding the link can download the asset without authentication. Public downloads validate paths and file types and reject path traversal.
-
-<details>
-<summary>Chat Completions example</summary>
+### Text example
 
 ```bash
 curl http://localhost:3000/v1/chat/completions \
-  -H "Content-Type: application/json" \
   -H "Authorization: Bearer <auth-key>" \
-  -d '{"model":"gpt-5","messages":[{"role":"user","content":"Introduce this project"}],"stream":true}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "messages": [{"role":"user","content":"Introduce this project"}],
+    "stream": true
+  }'
 ```
 
-</details>
-
-<details>
-<summary>Image generation example</summary>
+### Synchronous image example
 
 ```bash
 curl http://localhost:3000/v1/images/generations \
-  -H "Content-Type: application/json" \
   -H "Authorization: Bearer <auth-key>" \
-  -d '{"model":"gpt-image-2","prompt":"A cat floating in space, cinematic lighting","n":1,"response_format":"b64_json"}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "A cat floating in space, cinematic lighting",
+    "n": 1
+  }'
 ```
 
-</details>
+## Asynchronous image jobs
 
-Available models depend on the upstream accounts and the current `/v1/models` response.
+Async execution is implemented in the source. It is not a separate model and it is not `stream: true`. Add `async: true` to the normal image request; the service returns a task ID immediately and a background worker continues the job.
 
-## Configuration
+```text
+submit async=true -> receive HTTP 202 and task ID -> background generation -> poll -> claim result
+```
 
-| Setting | Default | Purpose |
-| --- | --- | --- |
-| `CHATGPT2API_AUTH_KEY` | Required | Administrator and default API key; the environment variable takes precedence over `config.json` |
-| `DATABASE_URL` | SQLite | Application Database connection; defaults to `data/chatgpt2api.db` when unset |
-| `CHATGPT2API_BASE_URL` | Current service URL | Public base URL used for generated image and file links |
-| `CHATGPT2API_THREAD_TOKENS` | `120` | Capacity for synchronous backend worker threads; accepts any positive integer, while accounts, proxies, and upstream services retain their own limits |
-| `account_processing_concurrency` | `30` | Capacity for account imports, refreshes, synchronization, and batch processing |
-| `image_account_concurrency` | `1` | Per-account image concurrency, configurable from 1 to 3 |
-| `image_stream_timeout_secs` | `80` | Maximum wait for the upstream image SSE/HTTP stream |
-| `image_poll_timeout_secs` | `60` | Maximum wait for image result polling and parsing |
-| `log_retention_hours` | `24` | Automatic call-record retention period in hours |
+### Server requirements
 
-Other settings are managed through the console. The current backend projection is authoritative for defaults and constraints.
+Async jobs are disabled by default. The server must meet all of these requirements:
 
-## Local Development
+1. Use PostgreSQL account storage with `STORAGE_BACKEND=postgres`.
+2. Configure `DATABASE_URL` and `CHATGPT2API_ACCOUNT_ENCRYPTION_KEY`.
+3. Set `CHATGPT2API_ASYNC_IMAGES_ENABLED=true`.
+4. Add permitted User Key `subject_id` values to `CHATGPT2API_ASYNC_IMAGE_ALLOWED_SUBJECTS`; the administrator root key uses `admin`.
+5. In a multi-instance deployment, mount the same `CHATGPT2API_ASYNC_IMAGE_ASSET_ROOT` for every worker.
+
+### Submit a job
 
 ```bash
-# Backend: Python 3.13 + uv
-uv sync
-uv run main.py
-
-# Frontend: Node.js + npm
-cd web-vue
-npm install
-npm run dev
+curl http://localhost:3000/v1/images/generations \
+  -H "Authorization: Bearer <auth-key>" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: stable-request-id" \
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "A cat floating in space",
+    "async": true
+  }'
 ```
 
-The frontend development server defaults to `http://localhost:5173`, with backend requests forwarded by the Vite development proxy.
+The service responds with HTTP `202`. Its body, `Location`, and `Retry-After` values tell the client how to poll:
 
-## Documentation
+```json
+{
+  "id": "img_...",
+  "object": "image.task",
+  "status": "queued",
+  "mode": "generation",
+  "model": "gpt-image-2",
+  "created_at": 1787190000,
+  "expires_at": 1787193600,
+  "poll_url": "/v1/images/tasks/img_...?model=gpt-image-2",
+  "retry_after_seconds": 4
+}
+```
 
-| Document | Scope |
+`Idempotency-Key` prevents a network retry from creating the same job twice. The body may instead contain `idempotency_key`; if the header and body field are both present, their values must match.
+
+### Poll and claim the result
+
+```bash
+curl "http://localhost:3000/v1/images/tasks/<task_id>?model=gpt-image-2" \
+  -H "Authorization: Bearer <auth-key>"
+```
+
+Polling must use **the same API key and the same `model` used for submission**.
+
+| Status | Meaning |
 | --- | --- |
-| [Documentation index](https://github.com/yukkcat/chatgpt2api/blob/main/docs/README.md) | Entry point for current architecture and maintenance documents |
-| [Deployment and operations](https://github.com/yukkcat/chatgpt2api/blob/main/docs/deployment.md) | Docker, PostgreSQL, upgrades, backups, and troubleshooting |
-| [Storage architecture](https://github.com/yukkcat/chatgpt2api/blob/main/docs/storage-architecture.md) | Application Database and file-storage boundaries |
-| [Console architecture](https://github.com/yukkcat/chatgpt2api/blob/main/docs/control-panel-architecture.md) | Frontend/backend responsibilities, business projections, and interaction state |
-| [Image failure handling](https://github.com/yukkcat/chatgpt2api/blob/main/docs/image-failure-handling.md) | Image failure classification, retries, and account handling |
-| [Upstream SSE](https://github.com/yukkcat/chatgpt2api/blob/main/docs/upstream-sse-conversation.md) | Conversation and stream-parsing boundaries |
+| `queued` | Accepted and waiting for a worker |
+| `running` | A worker is calling the upstream |
+| `succeeded` | Generation completed and the result can be claimed |
+| `failed` | The job failed and returns an OpenAI-style error |
 
-If documentation conflicts with the implementation, the current code, tests, and public API contracts are authoritative.
+The first successful claim returns HTTP `200` with `data[]`:
+
+```json
+{
+  "id": "img_...",
+  "object": "image.task",
+  "status": "succeeded",
+  "model": "gpt-image-2",
+  "data": [{"url":"/v1/images/tasks/img_.../results/0?model=gpt-image-2","revised_prompt":"..."}],
+  "usage": {"total_tokens": 123}
+}
+```
+
+Omitting `response_format` or passing `url` returns download URLs. Passing `b64_json` explicitly returns inline Base64.
+
+> **Only the successful `data[]` claim is limited to one; the image itself is not limited to one download.** Polling the same task again returns `404` to prevent duplicate downstream settlement. A URL can be downloaded repeatedly with the same Bearer key until the job expires.
+
+```bash
+curl -L \
+  -H "Authorization: Bearer <auth-key>" \
+  "http://localhost:3000/v1/images/tasks/<task_id>/results/0?model=gpt-image-2" \
+  -o image.png
+```
+
+For gateways that cannot forward GET requests, the original image endpoint also supports compatibility polling. A pending POST poll returns HTTP `202`; a successful poll returns HTTP `200`:
+
+```bash
+curl http://localhost:3000/v1/images/generations \
+  -H "Authorization: Bearer <auth-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-image-2","task_id":"img_..."}'
+```
+
+Image editing supports async execution as well: add `-F "async=true"` to a multipart `/v1/images/edits` request. `async: true` and `stream: true` cannot be enabled together.
+
+## Async job configuration
+
+| Environment variable | Default | Purpose |
+| --- | --- | --- |
+| `CHATGPT2API_ASYNC_IMAGES_ENABLED` | `false` | Enables async image jobs; PostgreSQL only |
+| `CHATGPT2API_ASYNC_IMAGE_ALLOWED_SUBJECTS` | Empty | Allowed `subject_id` list; empty rejects all submissions |
+| `CHATGPT2API_ASYNC_IMAGE_WORKERS` | `8` | Background worker count, from 1 to 64 |
+| `CHATGPT2API_ASYNC_IMAGE_QUEUE_CAPACITY` | `64` | Global outstanding-job limit |
+| `CHATGPT2API_ASYNC_IMAGE_OWNER_OUTSTANDING` | `8` | Outstanding-job limit per User Key |
+| `CHATGPT2API_ASYNC_IMAGE_OWNER_SUBMISSIONS_PER_MINUTE` | `30` | Submission limit per User Key per minute |
+| `CHATGPT2API_ASYNC_IMAGE_RESULT_TTL_MINUTES` | `60` | Retention for unclaimed results, up to 7 days |
+| `CHATGPT2API_ASYNC_IMAGE_MAX_STORED_BYTES` | `10 GiB` | Global storage limit for unclaimed results |
+| `CHATGPT2API_ASYNC_IMAGE_ASSET_ROOT` | `data/image-jobs` | Input and result asset directory |
+
+## Local development
+
+Use the Go version declared by the repository's `go.mod`:
+
+```bash
+go test ./...
+make run
+```
+
+To rebuild the web console before running:
+
+```bash
+make web
+make run
+```
 
 ## License
 
-The current repository is distributed under the [GNU Affero General Public License v3.0](https://github.com/yukkcat/chatgpt2api/blob/main/LICENSE) (`AGPL-3.0-only`). If you modify the software and make it available over a network, you must offer the corresponding source code to users of that service as required by the license.
-
-Code derived from [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) retains its original MIT copyright and license notice; see [NOTICE](https://github.com/yukkcat/chatgpt2api/blob/main/NOTICE). Versions previously released under MIT remain available under their original license.
-
-## Project Contributors
-
-[View ChatGPT2API contributors](https://github.com/yukkcat/chatgpt2api/graphs/contributors).
-
-## Original Project and Contributors
-
-This project evolved from [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api). Thanks to the original author and all contributors. [View the original project contributors](https://github.com/basketikun/chatgpt2api/graphs/contributors).
-
-## Community and Links
-
-- QQ group: [1005859624](https://qm.qq.com/q/yegwCqJisS)
-- Community: [Linux.do](https://linux.do)
+The project uses the [GNU AGPL v3.0](https://github.com/yukkcat/gpt2api-go/blob/main/LICENSE). If you modify it and provide the software to users over a network, provide the corresponding source as required by the license.
