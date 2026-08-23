@@ -22,11 +22,12 @@ Authorization: Bearer <API_KEY>
 | 模型 | 调用说明 |
 | --- | --- |
 | `gpt-image-2` | 默认模型，仅支持 1K |
+| `gpt-image-2-exact` | 精确尺寸模型，最高支持 4K；可按 `size` 强制输出指定像素尺寸，使用高质量 Lanczos 等比缩放与居中裁切 |
 | `gpt-image-2-vip` | `quality` 固定为 `medium`，支持 1K / 2K / 4K |
 | `gpt-image-2-high` | 支持 `quality=medium` 和 `quality=high`，支持 1K / 2K / 4K |
 | `gpt-image-2-c` | 企业级模型，100% 成功率；与其他模型使用相同的调用格式，支持 1K / 2K / 4K |
 
-四个模型都通过同一组文生图与图像编辑接口调用。
+五个模型都通过同一组文生图与图像编辑接口调用。
 
 ## 参数
 
@@ -34,7 +35,7 @@ Authorization: Bearer <API_KEY>
 | --- | --- | --- |
 | `model` | 是 | 上表中的模型名 |
 | `prompt` | 是 | 提示词，中英文皆可 |
-| `size` | 否 | `宽x高` 像素，如 `1024x1024`、`3840x2160`；按模型支持填写 |
+| `size` | 否 | `宽x高` 像素，如 `1024x1024`、`3840x2160`；`gpt-image-2-exact` 会严格按该尺寸输出 |
 | `quality` | 否 | `gpt-image-2-high` 支持 `medium` / `high`；`gpt-image-2-vip` 固定为 `medium` |
 | `n` | 否 | 一次出几张，默认 `1` |
 | `response_format` | 否 | `url`（默认）或 `b64_json` |
@@ -207,6 +208,25 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 
 </Tab>
 </Tabs>
+
+### 精确尺寸模型 · `gpt-image-2-exact`
+
+需要图片严格符合指定像素尺寸时，使用 `gpt-image-2-exact`：
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2-exact",
+    "prompt": "未来城市夜景，霓虹灯光，电影感广角构图",
+    "size": "3840x2160"
+  }'
+```
+
+返回图片的最终尺寸会严格为 `3840x2160`。该模型最高支持 4K 输出；显式像素尺寸的宽、高需在 `64`～`4096` 之间，总像素不得超过 `4096x4096`。
+
+服务会先对图片进行高质量 Lanczos 等比覆盖缩放，再从中心裁切到目标尺寸。原图与目标图宽高比不同时，四周可能被裁掉少量内容，建议把主体和文字放在画面中央的安全区域。
 
 ### 高质量模型 · `gpt-image-2-high`
 

@@ -22,11 +22,12 @@ Authorization: Bearer <API_KEY>
 | Model | Usage |
 | --- | --- |
 | `gpt-image-2` | Default model; supports 1K only |
+| `gpt-image-2-exact` | Exact-size model with up to 4K output; `size` enforces the final pixel dimensions using high-quality Lanczos cover resizing and center cropping |
 | `gpt-image-2-vip` | `quality` is fixed to `medium`; supports 1K / 2K / 4K |
 | `gpt-image-2-high` | Supports `quality=medium` and `quality=high`; supports 1K / 2K / 4K |
 | `gpt-image-2-c` | Enterprise model with 100% success rate; uses the same request format and supports 1K / 2K / 4K |
 
-All four models use the same generation and editing endpoints.
+All five models use the same generation and editing endpoints.
 
 ## Parameters
 
@@ -34,7 +35,7 @@ All four models use the same generation and editing endpoints.
 | --- | --- | --- |
 | `model` | Yes | A model name from the table above |
 | `prompt` | Yes | Prompt text in English or Chinese |
-| `size` | No | `widthxheight` in pixels, such as `1024x1024` or `3840x2160`; use a size supported by the model |
+| `size` | No | `widthxheight` in pixels, such as `1024x1024` or `3840x2160`; `gpt-image-2-exact` returns the exact requested dimensions |
 | `quality` | No | `gpt-image-2-high` supports `medium` / `high`; `gpt-image-2-vip` is fixed to `medium` |
 | `n` | No | Number of images to generate; default: `1` |
 | `response_format` | No | `url` (default) or `b64_json` |
@@ -207,6 +208,25 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 
 </Tab>
 </Tabs>
+
+### Exact-size model - `gpt-image-2-exact`
+
+Use `gpt-image-2-exact` when the image must match specific pixel dimensions:
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2-exact",
+    "prompt": "A futuristic city at night, neon lighting, cinematic wide-angle composition",
+    "size": "3840x2160"
+  }'
+```
+
+The returned image is strictly `3840x2160`. The model supports output up to 4K; for explicit pixel sizes, each edge must be between `64` and `4096` pixels and the total pixel count must not exceed `4096x4096`.
+
+The service applies high-quality proportional Lanczos cover resizing, then center-crops the image to the target dimensions. When the source and target aspect ratios differ, a small area around the edges may be cropped; keep important subjects and text inside the central safe area.
 
 ### High quality - `gpt-image-2-high`
 
