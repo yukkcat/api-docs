@@ -15,35 +15,36 @@ Content-Type: application/json
 
 ## Models
 
-The request format is identical; only the model name changes:
+The endpoint structure is the same, but standard models and `-c` enterprise models use different request bodies:
 
 | Model | Best for |
 | --- | --- |
 | `gemini-3-pro-image-preview` | Image quality |
 | `gemini-3.1-flash-image-preview` | Speed; also supports `8:1` / `4:1` / `1:4` / `1:8` ultra-wide and ultra-tall ratios |
-| `gemini-3-pro-image-preview-c` | Enterprise Pro; native 4K, concurrency, and a 100% success rate |
-| `gemini-3.1-flash-image-preview-c` | Enterprise Flash; native 4K, concurrency, and a 100% success rate |
+| `gemini-3-pro-image-preview-c` | Enterprise Pro; uses the native Gemini protocol and supports 4K, concurrency, and a 100% success rate |
+| `gemini-3.1-flash-image-preview-c` | Enterprise Flash; uses the native Gemini protocol and supports 4K, concurrency, and a 100% success rate |
 
-Enterprise and standard models use the same native Gemini request format. Only replace the model name in the URL.
+- **Standard models**: for compatibility with the current API, set dimensions under both `generationConfig.imageConfig` and `generationConfig.responseFormat.image`.
+- **`-c` enterprise models**: use native Gemini passthrough and send only `generationConfig.imageConfig`; do not send the non-native `responseFormat` field.
 
 ## Parameters
-
-For compatibility with both native Gemini parameters and the current API, set the aspect ratio and resolution under both `generationConfig.imageConfig` and `generationConfig.responseFormat.image`, using identical values:
 
 | Parameter | Description |
 | --- | --- |
 | `imageConfig.aspectRatio` | Native Gemini aspect-ratio parameter; omit it for image-to-image requests to follow the reference image automatically |
 | `imageConfig.imageSize` | Native Gemini resolution parameter: `1K` / `2K` / `4K`; the K must be uppercase |
-| `responseFormat.image` | Compatibility parameter; copy the same `aspectRatio` and `imageSize` values here |
-| `responseModalities` | `['IMAGE']` returns base64, `['TEXT']` returns a URL, and `['IMAGE','TEXT']` returns both |
+| `responseFormat.image` | Compatibility parameter for standard models only; copy the same `aspectRatio` and `imageSize` values here, but do not send it to a `-c` model |
+| `responseModalities` | `['IMAGE']` requests an image; the standard compatibility route also supports `['TEXT']` for a URL and `['IMAGE','TEXT']` for both; a native `-c` image part must be returned as `parts[].inlineData` |
 
-> For 2K or 4K output, send both parameter groups. Sending only `responseFormat.image` may still produce the default 1K output—for example, 896x1200 at `3:4`.
+> For 2K or 4K output from a standard model, send both dimension groups. Sending only `responseFormat.image` may still produce the default 1K output—for example, 896x1200 at `3:4`.
+
+> For 2K or 4K output from a `-c` model, send only `imageConfig`. An HTTP 200 response after including `responseFormat` does not mean that this non-native field took effect.
 
 > Do not send `aspectRatio: "auto"`. Omit `aspectRatio` to use automatic sizing.
 
 ## Supported ratios and pixels
 
-All four models support these ten common aspect ratios:
+The table shows the target pixels when aspect-ratio and resolution parameters are honored correctly. A `-c` model must pass the dimension and response-structure checks below; HTTP 200 alone is not sufficient:
 
 | Ratio | 1K | 2K | 4K |
 | --- | --- | --- | --- |
@@ -62,9 +63,9 @@ Only the Flash family, `gemini-3.1-flash-image-preview` and `gemini-3.1-flash-im
 
 > The model can produce strong architecture, color, and composition, but long Chinese passages may still contain missing, incorrect, or reordered characters. Add body text in a design tool after generation instead of treating long text rendered inside an image as final copy.
 
-### Requesting 4K reliably
+### Standard models: requesting 4K reliably
 
-This example uses `3:4`. Keep both parameter groups identical:
+This non-`-c` example uses `3:4`. Keep both parameter groups identical:
 
 ```json
 {
@@ -84,9 +85,88 @@ This example uses `3:4`. Keep both parameter groups identical:
 }
 ```
 
-A `3:4` 4K result should be approximately 3584x4800. An actual result of 896x1200 means the request was still processed as 1K.
+For a standard model, `3:4 + 4K` should return 3584x4800. An actual result of 896x1200 means the request was still processed as 1K.
+
+### `-c` enterprise models: native 4K request
+
+For a `-c` model, keep only the native Gemini `imageConfig` field. The complete request body is:
+
+```bash
+curl -X POST "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview-c:generateContent" \
+  -H "x-goog-api-key: <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "role": "user",
+      "parts": [{ "text": "Your prompt" }]
+    }],
+    "generationConfig": {
+      "responseModalities": ["IMAGE"],
+      "imageConfig": {
+        "aspectRatio": "3:4",
+        "imageSize": "4K"
+      }
+    }
+  }'
+```
+
+The core request body is:
+
+```json
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        { "text": "Your prompt" }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": {
+      "aspectRatio": "3:4",
+      "imageSize": "4K"
+    }
+  }
+}
+```
+
+Do not add `generationConfig.responseFormat` to a `-c` request.
+
+A successful native response should contain an image part like this (the actual base64 data is omitted):
+
+```json
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "inlineData": {
+              "mimeType": "image/png",
+              "data": "<BASE64>"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+#### Validating native `-c` routing
+
+Do not rely on the HTTP status alone. After deployment, `3:4 + 4K` must satisfy both assertions:
+
+1. The actual image dimensions are **3584x4800**.
+2. The image is returned at `candidates[].content.parts[].inlineData`, not as a Markdown data URL inside `parts[].text`.
+
+If the response is HTTP 200 but the image is still a landscape 1408x768 file and the response contains a Markdown data URL in `parts[].text`, the request is still reaching the old compatibility route. In that case, `imageConfig` and `responseModalities` are not being honored as native Gemini fields. Receiving HTTP 200 with or without `responseFormat` only means that the field was accepted or ignored; it does not prove that 4K took effect.
 
 ## Quick start
+
+All seven language examples below use a **standard model**, so they send both `imageConfig` and `responseFormat.image`. To use a `-c` model, replace the model name in the URL and remove the entire `responseFormat` block.
 
 <Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
 <Tab>
@@ -311,7 +391,7 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 </Tab>
 </Tabs>
 
-The image is returned at `candidates[0].content.parts[0].inline_data.data`.
+For the standard compatibility response, the image is typically returned at `candidates[0].content.parts[0].inline_data.data`. A native `-c` response must use `candidates[].content.parts[].inlineData.data`; if it returns only `parts[].text`, use the routing checks above.
 
 ### Text to image - URL
 
@@ -359,7 +439,7 @@ Replace `inline_data` above with:
 
 ### Follow the reference ratio at 2K
 
-Set only `imageSize` in both locations and omit `aspectRatio`:
+For a standard model, set only `imageSize` in both locations and omit `aspectRatio`:
 
 ```json
 {
@@ -374,5 +454,7 @@ Set only `imageSize` in both locations and omit `aspectRatio`:
   }
 }
 ```
+
+For a `-c` model, remove `responseFormat` and keep only `imageConfig.imageSize`.
 
 When both `aspectRatio` and `imageSize` are omitted, the upstream service determines the reference ratio and output tier. For text-to-image requests that need a fixed shape, pass both the ratio and resolution.

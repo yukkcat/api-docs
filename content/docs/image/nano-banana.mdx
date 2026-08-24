@@ -15,35 +15,36 @@ Content-Type: application/json
 
 ## 模型
 
-调用方式完全一致，只换模型名：
+接口地址结构相同，但普通模型与 `-c` 企业模型的请求体不同：
 
 | 模型名 | 取向 |
 | --- | --- |
 | `gemini-3-pro-image-preview` | 画质优先 |
 | `gemini-3.1-flash-image-preview` | 速度优先；额外支持 `8:1` / `4:1` / `1:4` / `1:8` 超宽长条 |
-| `gemini-3-pro-image-preview-c` | Pro 企业模型；支持原生 4K、并发，100% 成功率 |
-| `gemini-3.1-flash-image-preview-c` | Flash 企业模型；支持原生 4K、并发，100% 成功率 |
+| `gemini-3-pro-image-preview-c` | Pro 企业模型；按 Gemini 原生协议调用，支持 4K、并发，100% 成功率 |
+| `gemini-3.1-flash-image-preview-c` | Flash 企业模型；按 Gemini 原生协议调用，支持 4K、并发，100% 成功率 |
 
-企业模型与普通模型使用相同的 Gemini 原生调用格式，只需替换 URL 中的模型名。
+- **普通模型**：为兼容当前接口，尺寸同时写入 `generationConfig.imageConfig` 和 `generationConfig.responseFormat.image`。
+- **`-c` 企业模型**：使用 Gemini 原生透传格式，只写 `generationConfig.imageConfig`；不要发送非原生的 `responseFormat`。
 
 ## 参数
-
-为了兼容 Gemini 原生参数和当前接口，比例与分辨率建议同时填写在 `generationConfig.imageConfig` 和 `generationConfig.responseFormat.image`，两处值保持一致：
 
 | 参数 | 说明 |
 | --- | --- |
 | `imageConfig.aspectRatio` | Gemini 原生比例参数，见下表；图生图省略时根据参考图自动决定 |
 | `imageConfig.imageSize` | Gemini 原生分辨率参数：`1K` / `2K` / `4K`，K 必须大写 |
-| `responseFormat.image` | 接口兼容参数；复制相同的 `aspectRatio` 和 `imageSize` |
-| `responseModalities` | `["IMAGE"]` 返回 base64、`["TEXT"]` 返回 URL、`["IMAGE","TEXT"]` 两者都返回 |
+| `responseFormat.image` | 仅普通模型使用的接口兼容参数；复制相同的 `aspectRatio` 和 `imageSize`，`-c` 模型不要发送 |
+| `responseModalities` | `["IMAGE"]` 请求图片；普通模型兼容接口还支持 `["TEXT"]` 返回 URL、`["IMAGE","TEXT"]` 同时返回；`-c` 原生图片节点应为 `parts[].inlineData` |
 
-> 请求 2K / 4K 时请同时传两组参数。只传 `responseFormat.image` 可能仍按默认 1K 生成，例如 `3:4` 只得到 896×1200。
+> 普通模型请求 2K / 4K 时请同时传两组尺寸参数。只传 `responseFormat.image` 可能仍按默认 1K 生成，例如 `3:4` 只得到 896×1200。
+
+> `-c` 模型请求 2K / 4K 时只传 `imageConfig`。即使现网接受 `responseFormat` 并返回 HTTP 200，也不代表这个非原生参数已经生效。
 
 > 自动比例不要传 `aspectRatio: "auto"`，正确写法是省略 `aspectRatio`。
 
 ## 支持的比例与像素
 
-10 个通用比例，四个模型都支持：
+下表是四个模型在比例与分辨率参数正确生效时的目标像素。`-c` 模型必须通过后文的尺寸和响应结构验收，不能只凭 HTTP 200 判断：
 
 | 比例 | 1K | 2K | 4K |
 | --- | --- | --- | --- |
@@ -62,9 +63,9 @@ Content-Type: application/json
 
 > 模型适合生成建筑、色彩和构图，但长段中文仍可能出现错字、漏字或顺序错误。正文排版建议在生成图片后使用设计软件添加，不要把图片中的长文本直接作为最终文稿。
 
-### 稳定请求 4K
+### 普通模型：稳定请求 4K
 
-下面以 `3:4` 为例。两组尺寸参数必须一致：
+下面以非 `-c` 的普通模型为例，两组尺寸参数必须一致：
 
 ```json
 {
@@ -84,9 +85,88 @@ Content-Type: application/json
 }
 ```
 
-`3:4` 的 4K 结果应为约 3584×4800；如果实际只有 896×1200，说明请求仍按 1K 处理。
+普通模型的 `3:4 + 4K` 结果应为 3584×4800；如果实际只有 896×1200，说明请求仍按 1K 处理。
+
+### `-c` 企业模型：原生请求 4K
+
+`-c` 模型只保留 Gemini 原生的 `imageConfig`，完整请求如下：
+
+```bash
+curl -X POST "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview-c:generateContent" \
+  -H "x-goog-api-key: <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "role": "user",
+      "parts": [{ "text": "提示词" }]
+    }],
+    "generationConfig": {
+      "responseModalities": ["IMAGE"],
+      "imageConfig": {
+        "aspectRatio": "3:4",
+        "imageSize": "4K"
+      }
+    }
+  }'
+```
+
+请求体中的核心部分如下：
+
+```json
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        { "text": "提示词" }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": {
+      "aspectRatio": "3:4",
+      "imageSize": "4K"
+    }
+  }
+}
+```
+
+不要在 `-c` 请求中加入 `generationConfig.responseFormat`。
+
+成功的原生响应应包含类似下面的图片节点（省略实际 base64 数据）：
+
+```json
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "inlineData": {
+              "mimeType": "image/png",
+              "data": "<BASE64>"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+#### 如何验收 `-c` 原生路由
+
+不能只看 HTTP 状态码。部署更新后，`3:4 + 4K` 必须同时满足：
+
+1. 实际图片尺寸为 **3584×4800**。
+2. 图片位于 `candidates[].content.parts[].inlineData`，而不是 `parts[].text` 中的 Markdown data URL。
+
+如果返回 HTTP 200，但图片仍为横版 1408×768，且响应是 `parts[].text` 中的 Markdown data URL，说明请求仍走旧的兼容路由，`imageConfig` 和 `responseModalities` 没有按 Gemini 原生协议生效。带不带 `responseFormat` 都返回 200，只能说明该字段被接受或忽略，不能证明 4K 已生效。
 
 ## 快速调用
+
+下面七种语言均使用**普通模型**，所以同时发送 `imageConfig` 和 `responseFormat.image`。改用 `-c` 模型时，除替换 URL 中的模型名外，还必须删除整个 `responseFormat` 块。
 
 <Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
 <Tab>
@@ -307,7 +387,7 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 </Tab>
 </Tabs>
 
-图片位于 `candidates[0].content.parts[0].inline_data.data`。
+普通模型兼容响应的图片通常位于 `candidates[0].content.parts[0].inline_data.data`。`-c` 原生响应必须使用 `candidates[].content.parts[].inlineData.data`；如果只返回 `parts[].text`，请按上面的验收规则排查路由部署。
 
 ### 文生图 → URL
 
@@ -355,7 +435,7 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:gen
 
 ### 图生图自动跟随参考图比例，并固定 2K
 
-两处都只传 `imageSize`，省略 `aspectRatio`：
+普通模型在两处都只传 `imageSize`，省略 `aspectRatio`：
 
 ```json
 {
@@ -370,5 +450,7 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:gen
   }
 }
 ```
+
+使用 `-c` 模型时删除 `responseFormat`，只保留 `imageConfig.imageSize`。
 
 `aspectRatio` 和 `imageSize` 都省略时，参考图比例和输出档位由上游决定；文生图需要固定形状时，建议同时传比例和分辨率。
