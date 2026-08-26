@@ -1,11 +1,122 @@
 ---
 title: Nano Banana
-description: Gemini 原生 generateContent 文生图与图生图接口
+description: nano-banana-2 与 nano-banana-pro 的 OpenAI 兼容和 Gemini 原生图像接口
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
 <img src="/gemini-avatar.svg" alt="Nano Banana 插画" width="220" />
+
+Nano Banana 支持两套请求格式：OpenAI 兼容的 Images API，以及 Gemini 原生的 `generateContent`。两套格式都可以用于文生图；需要编辑已有图片时，OpenAI 格式使用 `/v1/images/edits`，Gemini 格式在 `contents.parts` 中附带图片。
+
+## 模型
+
+| 模型 | 说明 |
+| --- | --- |
+| `nano-banana-2` | Nano Banana 新版模型，支持 OpenAI Images API 和 Gemini 原生格式。 |
+| `nano-banana-pro` | Nano Banana Pro 模型，支持 OpenAI Images API 和 Gemini 原生格式。 |
+| `gemini-3.1-flash-image-preview` | 兼容模型，按本页 Gemini 原生格式调用；可用能力以服务端配置为准。 |
+| `gemini-3-pro-image-preview` | 兼容模型，按本页 Gemini 原生格式调用；可用能力以服务端配置为准。 |
+
+请求体里的 `model` 和原生 Gemini URL 中的模型名使用同一个模型 ID。所有列出的 Gemini 模型使用同一套原生参数。
+
+## 选择请求格式
+
+| 需求 | 使用方式 |
+| --- | --- |
+| 已经接入 OpenAI SDK 或 Images API | `POST /v1/images/generations` |
+| 编辑图片，使用 OpenAI 兼容参数 | `POST /v1/images/edits` |
+| 需要 Gemini 原生字段 | `POST /v1beta/models/{model}:generateContent` |
+| 需要 Gemini 原生流式响应 | 将方法名改为 `:streamGenerateContent`，请求体保持一致 |
+
+## OpenAI 兼容格式
+
+### 文生图
+
+```http
+POST https://api.klong.lat/v1/images/generations
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "model": "nano-banana-2",
+  "prompt": "木桌上的红苹果，柔和棚拍光线，极简背景",
+  "size": "1024x1024",
+  "response_format": "url"
+}
+```
+
+`nano-banana-pro` 的调用方式相同，只需要把 `model` 改成 `nano-banana-pro`。不传 `response_format` 时，服务端默认返回 URL；需要 Base64 时显式传 `b64_json`。`size` 使用服务端支持的尺寸值。
+
+### 图生图
+
+```http
+POST https://api.klong.lat/v1/images/edits
+Authorization: Bearer <API_KEY>
+Content-Type: multipart/form-data
+```
+
+```bash
+curl -X POST "https://api.klong.lat/v1/images/edits" \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=nano-banana-2" \
+  -F "prompt=改成日系水彩风，保留主体和构图" \
+  -F "response_format=url" \
+  -F "image=@input.png"
+```
+
+输入图片也可以使用 `image_url` 或 `image_b64`，具体字段以服务端接口为准。
+
+### OpenAI SDK
+
+<Tabs items={['Python', 'Node.js']}>
+<Tab>
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="<API_KEY>",
+    base_url="https://api.klong.lat/v1",
+)
+
+result = client.images.generate(
+    model="nano-banana-2",
+    prompt="木桌上的红苹果，柔和棚拍光线，极简背景",
+    size="1024x1024",
+)
+
+print(result.data[0].url)
+```
+
+</Tab>
+<Tab>
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "<API_KEY>",
+  baseURL: "https://api.klong.lat/v1",
+});
+
+const result = await client.images.generate({
+  model: "nano-banana-2",
+  prompt: "木桌上的红苹果，柔和棚拍光线，极简背景",
+  size: "1024x1024",
+});
+
+console.log(result.data[0].url);
+```
+
+</Tab>
+</Tabs>
+
+## Gemini 原生格式
+
+### 请求地址与请求头
 
 ```http
 POST https://api.klong.lat/v1beta/models/{model}:generateContent
@@ -13,104 +124,9 @@ x-goog-api-key: <API_KEY>
 Content-Type: application/json
 ```
 
-## 模型
+把 `{model}` 替换为 `nano-banana-2` 或 `nano-banana-pro`。比例与分辨率统一放在 `generationConfig.imageConfig` 中。
 
-接口地址结构相同，但普通模型与 `-c` 企业模型的请求体不同：
-
-| 模型名 | 取向 |
-| --- | --- |
-| `gemini-3-pro-image-preview` | 画质优先 |
-| `gemini-3.1-flash-image-preview` | 速度优先；额外支持 `8:1` / `4:1` / `1:4` / `1:8` 超宽长条 |
-| `gemini-3-pro-image-preview-c` | Pro 企业模型；按 Gemini 原生协议调用，支持 4K、并发，100% 成功率 |
-| `gemini-3.1-flash-image-preview-c` | Flash 企业模型；按 Gemini 原生协议调用，支持 4K、并发，100% 成功率 |
-
-- **普通模型**：为兼容当前接口，尺寸同时写入 `generationConfig.imageConfig` 和 `generationConfig.responseFormat.image`。
-- **`-c` 企业模型**：使用 Gemini 原生透传格式，只写 `generationConfig.imageConfig`；不要发送非原生的 `responseFormat`。
-
-## 参数
-
-| 参数 | 说明 |
-| --- | --- |
-| `imageConfig.aspectRatio` | Gemini 原生比例参数，见下表；图生图省略时根据参考图自动决定 |
-| `imageConfig.imageSize` | Gemini 原生分辨率参数：`1K` / `2K` / `4K`，K 必须大写 |
-| `responseFormat.image` | 仅普通模型使用的接口兼容参数；复制相同的 `aspectRatio` 和 `imageSize`，`-c` 模型不要发送 |
-| `responseModalities` | `["IMAGE"]` 请求图片；普通模型兼容接口还支持 `["TEXT"]` 返回 URL、`["IMAGE","TEXT"]` 同时返回；`-c` 原生图片节点应为 `parts[].inlineData` |
-
-> 普通模型请求 2K / 4K 时请同时传两组尺寸参数。只传 `responseFormat.image` 可能仍按默认 1K 生成，例如 `3:4` 只得到 896×1200。
-
-> `-c` 模型请求 2K / 4K 时只传 `imageConfig`。即使现网接受 `responseFormat` 并返回 HTTP 200，也不代表这个非原生参数已经生效。
-
-> 自动比例不要传 `aspectRatio: "auto"`，正确写法是省略 `aspectRatio`。
-
-## 支持的比例与像素
-
-下表是四个模型在比例与分辨率参数正确生效时的目标像素。`-c` 模型必须通过后文的尺寸和响应结构验收，不能只凭 HTTP 200 判断：
-
-| 比例 | 1K | 2K | 4K |
-| --- | --- | --- | --- |
-| `1:1` | 1024×1024 | 2048×2048 | 4096×4096 |
-| `16:9` | 1376×768 | 2752×1536 | 5504×3072 |
-| `9:16` | 768×1376 | 1536×2752 | 3072×5504 |
-| `4:3` | 1200×896 | 2400×1792 | 4800×3584 |
-| `3:4` | 896×1200 | 1792×2400 | 3584×4800 |
-| `3:2` | 1264×848 | 2528×1696 | 5056×3392 |
-| `2:3` | 848×1264 | 1696×2528 | 3392×5056 |
-| `5:4` | 1152×928 | 2304×1856 | 4608×3712 |
-| `4:5` | 928×1152 | 1856×2304 | 3712×4608 |
-| `21:9` | 1584×672 | 3168×1344 | 6336×2688 |
-
-超宽长条仅 Flash 系列 `gemini-3.1-flash-image-preview` 与 `gemini-3.1-flash-image-preview-c` 支持：`8:1` = 2928×352、`4:1` = 2064×512、`1:4` = 512×2064、`1:8` = 352×2928，2K / 4K 对应放大 2 / 4 倍。
-
-> 模型适合生成建筑、色彩和构图，但长段中文仍可能出现错字、漏字或顺序错误。正文排版建议在生成图片后使用设计软件添加，不要把图片中的长文本直接作为最终文稿。
-
-### 普通模型：稳定请求 4K
-
-下面以非 `-c` 的普通模型为例，两组尺寸参数必须一致：
-
-```json
-{
-  "generationConfig": {
-    "responseModalities": ["IMAGE"],
-    "imageConfig": {
-      "aspectRatio": "3:4",
-      "imageSize": "4K"
-    },
-    "responseFormat": {
-      "image": {
-        "aspectRatio": "3:4",
-        "imageSize": "4K"
-      }
-    }
-  }
-}
-```
-
-普通模型的 `3:4 + 4K` 结果应为 3584×4800；如果实际只有 896×1200，说明请求仍按 1K 处理。
-
-### `-c` 企业模型：原生请求 4K
-
-`-c` 模型只保留 Gemini 原生的 `imageConfig`，完整请求如下：
-
-```bash
-curl -X POST "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview-c:generateContent" \
-  -H "x-goog-api-key: <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "contents": [{
-      "role": "user",
-      "parts": [{ "text": "提示词" }]
-    }],
-    "generationConfig": {
-      "responseModalities": ["IMAGE"],
-      "imageConfig": {
-        "aspectRatio": "3:4",
-        "imageSize": "4K"
-      }
-    }
-  }'
-```
-
-请求体中的核心部分如下：
+### 原生文生图请求
 
 ```json
 {
@@ -118,23 +134,31 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview
     {
       "role": "user",
       "parts": [
-        { "text": "提示词" }
+        { "text": "木桌上的红苹果，柔和棚拍光线，极简背景" }
       ]
     }
   ],
   "generationConfig": {
     "responseModalities": ["IMAGE"],
     "imageConfig": {
-      "aspectRatio": "3:4",
-      "imageSize": "4K"
+      "aspectRatio": "1:1",
+      "imageSize": "1K"
     }
   }
 }
 ```
 
-不要在 `-c` 请求中加入 `generationConfig.responseFormat`。
+OpenAI 的 `size` 和 `response_format` 不属于 Gemini 原生请求。Gemini 图像参数如下：
 
-成功的原生响应应包含类似下面的图片节点（省略实际 base64 数据）：
+| 字段 | 说明 |
+| --- | --- |
+| `responseModalities` | 返回图片时传 `['IMAGE']`。 |
+| `imageConfig.aspectRatio` | 图片比例，例如 `1:1`、`16:9`、`3:4`。不需要固定比例时省略。 |
+| `imageConfig.imageSize` | 分辨率档位，例如 `1K`、`2K`、`4K`；以当前模型和服务端支持范围为准。 |
+
+### 原生响应
+
+图片通常位于 `candidates[0].content.parts` 的 `inlineData` 节点：
 
 ```json
 {
@@ -155,39 +179,25 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview
 }
 ```
 
-#### 如何验收 `-c` 原生路由
+### 各语言原生示例
 
-不能只看 HTTP 状态码。部署更新后，`3:4 + 4K` 必须同时满足：
-
-1. 实际图片尺寸为 **3584×4800**。
-2. 图片位于 `candidates[].content.parts[].inlineData`，而不是 `parts[].text` 中的 Markdown data URL。
-
-如果返回 HTTP 200，但图片仍为横版 1408×768，且响应是 `parts[].text` 中的 Markdown data URL，说明请求仍走旧的兼容路由，`imageConfig` 和 `responseModalities` 没有按 Gemini 原生协议生效。带不带 `responseFormat` 都返回 200，只能说明该字段被接受或忽略，不能证明 4K 已生效。
-
-## 快速调用
-
-下面七种语言均使用**普通模型**，所以同时发送 `imageConfig` 和 `responseFormat.image`。改用 `-c` 模型时，除替换 URL 中的模型名外，还必须删除整个 `responseFormat` 块。
+下面的示例都使用 `nano-banana-2`。使用 Pro 时，只替换 URL 中的模型名；请求体不变。
 
 <Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
 <Tab>
 
 ```bash
-curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent" \
+curl -X POST "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent" \
   -H "x-goog-api-key: <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "contents": [{
       "role": "user",
-      "parts": [{ "text": "木桌上的红苹果，棚拍光线，极简背景" }]
+      "parts": [{ "text": "木桌上的红苹果，柔和棚拍光线，极简背景" }]
     }],
     "generationConfig": {
       "responseModalities": ["IMAGE"],
-      "imageConfig": {
-        "aspectRatio": "1:1", "imageSize": "1K"
-      },
-      "responseFormat": {
-        "image": { "aspectRatio": "1:1", "imageSize": "1K" }
-      }
+      "imageConfig": { "aspectRatio": "1:1", "imageSize": "1K" }
     }
   }'
 ```
@@ -195,25 +205,18 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:gen
 </Tab>
 <Tab>
 
-```bash
-pip install requests
-```
-
 ```python
 import requests
 
-url = "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"
+url = "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent"
 payload = {
     "contents": [{
         "role": "user",
-        "parts": [{"text": "木桌上的红苹果，棚拍光线，极简背景"}],
+        "parts": [{"text": "木桌上的红苹果，柔和棚拍光线，极简背景"}],
     }],
     "generationConfig": {
         "responseModalities": ["IMAGE"],
         "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"},
-        "responseFormat": {
-            "image": {"aspectRatio": "1:1", "imageSize": "1K"},
-        },
     },
 }
 
@@ -230,29 +233,26 @@ print(response.json())
 <Tab>
 
 ```javascript
-const url =
-  "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent";
-
-const response = await fetch(url, {
-  method: "POST",
-  headers: {
-    "x-goog-api-key": "<API_KEY>",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    contents: [{
-      role: "user",
-      parts: [{ text: "木桌上的红苹果，棚拍光线，极简背景" }],
-    }],
-    generationConfig: {
-      responseModalities: ["IMAGE"],
-      imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
-      responseFormat: {
-        image: { aspectRatio: "1:1", imageSize: "1K" },
-      },
+const response = await fetch(
+  "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
+  {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": "<API_KEY>",
+      "Content-Type": "application/json",
     },
-  }),
-});
+    body: JSON.stringify({
+      contents: [{
+        role: "user",
+        parts: [{ text: "木桌上的红苹果，柔和棚拍光线，极简背景" }],
+      }],
+      generationConfig: {
+        responseModalities: ["IMAGE"],
+        imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+      },
+    }),
+  },
+);
 
 console.log(await response.json());
 ```
@@ -262,18 +262,15 @@ console.log(await response.json());
 
 ```php
 <?php
-$url = "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent";
+$url = "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent";
 $payload = [
     "contents" => [[
         "role" => "user",
-        "parts" => [["text" => "木桌上的红苹果，棚拍光线，极简背景"]],
+        "parts" => [["text" => "木桌上的红苹果，柔和棚拍光线，极简背景"]],
     ]],
     "generationConfig" => [
         "responseModalities" => ["IMAGE"],
         "imageConfig" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
-        "responseFormat" => [
-            "image" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
-        ],
     ],
 ];
 
@@ -305,16 +302,18 @@ import (
 )
 
 func main() {
-    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"},"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}`)
-    url := "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"
-    req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，柔和棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"}}}`)
+    req, _ := http.NewRequest(
+        "POST",
+        "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
+        bytes.NewReader(body),
+    )
     req.Header.Set("x-goog-api-key", "<API_KEY>")
     req.Header.Set("Content-Type", "application/json")
 
     resp, err := http.DefaultClient.Do(req)
     if err != nil { panic(err) }
     defer resp.Body.Close()
-
     data, _ := io.ReadAll(resp.Body)
     fmt.Println(string(data))
 }
@@ -332,11 +331,11 @@ import java.net.http.HttpResponse;
 public class Main {
   public static void main(String[] args) throws Exception {
     String body = """
-      {"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"},"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}
+      {"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，柔和棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"}}}
       """;
 
     HttpRequest request = HttpRequest.newBuilder()
-        .uri(URI.create("https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"))
+        .uri(URI.create("https://api.klong.lat/v1beta/models/nano-banana-2:generateContent"))
         .header("x-goog-api-key", "<API_KEY>")
         .header("Content-Type", "application/json")
         .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -359,13 +358,13 @@ using var client = new HttpClient();
 client.DefaultRequestHeaders.Add("x-goog-api-key", "<API_KEY>");
 
 var response = await client.PostAsJsonAsync(
-    "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent",
+    "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
     new {
         contents = new[] {
             new {
                 role = "user",
                 parts = new[] {
-                    new { text = "木桌上的红苹果，棚拍光线，极简背景" }
+                    new { text = "木桌上的红苹果，柔和棚拍光线，极简背景" }
                 }
             }
         },
@@ -373,9 +372,6 @@ var response = await client.PostAsJsonAsync(
             responseModalities = new[] { "IMAGE" },
             imageConfig = new {
                 aspectRatio = "1:1", imageSize = "1K"
-            },
-            responseFormat = new {
-                image = new { aspectRatio = "1:1", imageSize = "1K" }
             }
         }
     }
@@ -387,70 +383,60 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 </Tab>
 </Tabs>
 
-普通模型兼容响应的图片通常位于 `candidates[0].content.parts[0].inline_data.data`。`-c` 原生响应必须使用 `candidates[].content.parts[].inlineData.data`；如果只返回 `parts[].text`，请按上面的验收规则排查路由部署。
+## Gemini 原生图生图
 
-### 文生图 → URL
+### Base64 输入
 
-把 `responseModalities` 改成 `["TEXT"]`，URL 位于 `candidates[0].content.parts[1].file_data.file_uri`。同时需要 base64 和 URL 时使用 `["IMAGE","TEXT"]`。
+在 `parts` 中同时传文字和 `inlineData`。输入图片使用原生 Gemini 的 camelCase 字段：
 
-### 图生图（输入 base64）
-
-在 `parts` 中于文本之外加入一个图片 part：
-
-```bash
-curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent" \
-  -H "x-goog-api-key: <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "contents": [{
-      "role": "user",
-      "parts": [
-        { "text": "改成日系水彩风，保留主体和构图" },
-        {
-          "inline_data": {
-            "mime_type": "image/png",
-            "data": "<BASE64>"
-          }
+```json
+{
+  "contents": [{
+    "role": "user",
+    "parts": [
+      { "text": "改成日系水彩风，保留主体和构图" },
+      {
+        "inlineData": {
+          "mimeType": "image/png",
+          "data": "<BASE64>"
         }
-      ]
-    }],
-    "generationConfig": {
-      "responseModalities": ["IMAGE"]
-    }
-  }'
-```
-
-### 图生图（输入 URL）
-
-把上面的 `inline_data` 换成：
-
-```json
-{
-  "file_data": {
-    "mime_type": "image/png",
-    "file_uri": "https://example.com/input.png"
-  }
-}
-```
-
-### 图生图自动跟随参考图比例，并固定 2K
-
-普通模型在两处都只传 `imageSize`，省略 `aspectRatio`：
-
-```json
-{
+      }
+    ]
+  }],
   "generationConfig": {
     "responseModalities": ["IMAGE"],
-    "imageConfig": {
-      "imageSize": "2K"
-    },
-    "responseFormat": {
-      "image": { "imageSize": "2K" }
-    }
+    "imageConfig": { "imageSize": "2K" }
   }
 }
 ```
 
-使用 `-c` 模型时删除 `responseFormat`，只保留 `imageConfig.imageSize`。
+### URL 输入
 
-`aspectRatio` 和 `imageSize` 都省略时，参考图比例和输出档位由上游决定；文生图需要固定形状时，建议同时传比例和分辨率。
+如果服务端支持远程图片输入，可以使用 `fileData`：
+
+```json
+{
+  "fileData": {
+    "mimeType": "image/png",
+    "fileUri": "https://example.com/input.png"
+  }
+}
+```
+
+省略 `imageConfig.aspectRatio` 时，服务端可以根据参考图决定比例；需要固定比例时再传 `aspectRatio`。
+
+## 常见问题
+
+### OpenAI 和 Gemini 请求能混用吗？
+
+不能直接混用字段。OpenAI 兼容入口使用 `model`、`prompt`、`size` 和 `response_format`；Gemini 原生入口使用 `contents`、`generationConfig.responseModalities` 和 `generationConfig.imageConfig`。模型可以相同，但请求体要按入口书写。
+
+### `nano-banana-2` 和 `nano-banana-pro` 怎么选？
+
+先使用 `nano-banana-2` 验证请求格式和业务流程；需要使用 Pro 模型时把模型名替换为 `nano-banana-pro`，其他字段保持不变。具体速度、额度和可用尺寸以服务端当前配置为准。
+
+### 为什么看不到图片？
+
+先检查响应是否包含 `candidates[].content.parts[].inlineData.data`，并根据 `mimeType` 拼接 `data:{mimeType};base64,{data}`。如果使用 OpenAI 兼容格式，则读取 `data[0].url` 或 `data[0].b64_json`。
+
+长段中文仍可能出现错字、漏字或顺序错误。图片适合做构图和视觉草稿；需要准确排版的标题、条款或正文，建议生成后在设计软件中添加。

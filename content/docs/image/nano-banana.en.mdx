@@ -1,11 +1,122 @@
 ---
 title: Nano Banana
-description: Gemini generateContent API for text-to-image and image-to-image requests
+description: OpenAI-compatible and native Gemini image APIs for nano-banana-2 and nano-banana-pro
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
 <img src="/gemini-avatar.svg" alt="Nano Banana illustration" width="220" />
+
+Nano Banana supports two request formats: the OpenAI-compatible Images API and native Gemini `generateContent`. Both formats can generate images. For edits, use `/v1/images/edits` with the OpenAI-compatible format, or attach an image in `contents.parts` with the native Gemini format.
+
+## Models
+
+| Model | Description |
+| --- | --- |
+| `nano-banana-2` | The newer Nano Banana model; supports the OpenAI Images API and native Gemini format. |
+| `nano-banana-pro` | Nano Banana Pro; supports the OpenAI Images API and native Gemini format. |
+| `gemini-3.1-flash-image-preview` | Compatibility model; use the native Gemini format on this page, with capabilities determined by the service configuration. |
+| `gemini-3-pro-image-preview` | Compatibility model; use the native Gemini format on this page, with capabilities determined by the service configuration. |
+
+Use the same model ID in the OpenAI request body and in the native Gemini model URL. All listed Gemini models use the same native parameters.
+
+## Choose a request format
+
+| Need | Endpoint |
+| --- | --- |
+| An OpenAI SDK or Images API client | `POST /v1/images/generations` |
+| Image editing with OpenAI-compatible fields | `POST /v1/images/edits` |
+| Native Gemini fields | `POST /v1beta/models/{model}:generateContent` |
+| Native Gemini streaming | Change the method to `:streamGenerateContent`; keep the request body the same |
+
+## OpenAI-compatible format
+
+### Text to image
+
+```http
+POST https://api.klong.lat/v1/images/generations
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "model": "nano-banana-2",
+  "prompt": "A red apple on a wooden table, soft studio light, minimal background",
+  "size": "1024x1024",
+  "response_format": "url"
+}
+```
+
+The `nano-banana-pro` request is identical; change only `model`. When `response_format` is omitted, the service returns a URL by default. Pass `b64_json` explicitly for Base64. Use a `size` supported by the current service configuration.
+
+### Image editing
+
+```http
+POST https://api.klong.lat/v1/images/edits
+Authorization: Bearer <API_KEY>
+Content-Type: multipart/form-data
+```
+
+```bash
+curl -X POST "https://api.klong.lat/v1/images/edits" \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=nano-banana-2" \
+  -F "prompt=Restyle this image as Japanese watercolor while preserving the subject and composition" \
+  -F "response_format=url" \
+  -F "image=@input.png"
+```
+
+The input can also be supplied with `image_url` or `image_b64`, depending on the service endpoint.
+
+### OpenAI SDK
+
+<Tabs items={['Python', 'Node.js']}>
+<Tab>
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="<API_KEY>",
+    base_url="https://api.klong.lat/v1",
+)
+
+result = client.images.generate(
+    model="nano-banana-2",
+    prompt="A red apple on a wooden table, soft studio light, minimal background",
+    size="1024x1024",
+)
+
+print(result.data[0].url)
+```
+
+</Tab>
+<Tab>
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "<API_KEY>",
+  baseURL: "https://api.klong.lat/v1",
+});
+
+const result = await client.images.generate({
+  model: "nano-banana-2",
+  prompt: "A red apple on a wooden table, soft studio light, minimal background",
+  size: "1024x1024",
+});
+
+console.log(result.data[0].url);
+```
+
+</Tab>
+</Tabs>
+
+## Native Gemini format
+
+### URL and headers
 
 ```http
 POST https://api.klong.lat/v1beta/models/{model}:generateContent
@@ -13,104 +124,9 @@ x-goog-api-key: <API_KEY>
 Content-Type: application/json
 ```
 
-## Models
+Replace `{model}` with `nano-banana-2` or `nano-banana-pro`. Native Gemini requests use `generationConfig.imageConfig` for ratio and resolution.
 
-The endpoint structure is the same, but standard models and `-c` enterprise models use different request bodies:
-
-| Model | Best for |
-| --- | --- |
-| `gemini-3-pro-image-preview` | Image quality |
-| `gemini-3.1-flash-image-preview` | Speed; also supports `8:1` / `4:1` / `1:4` / `1:8` ultra-wide and ultra-tall ratios |
-| `gemini-3-pro-image-preview-c` | Enterprise Pro; uses the native Gemini protocol and supports 4K, concurrency, and a 100% success rate |
-| `gemini-3.1-flash-image-preview-c` | Enterprise Flash; uses the native Gemini protocol and supports 4K, concurrency, and a 100% success rate |
-
-- **Standard models**: for compatibility with the current API, set dimensions under both `generationConfig.imageConfig` and `generationConfig.responseFormat.image`.
-- **`-c` enterprise models**: use native Gemini passthrough and send only `generationConfig.imageConfig`; do not send the non-native `responseFormat` field.
-
-## Parameters
-
-| Parameter | Description |
-| --- | --- |
-| `imageConfig.aspectRatio` | Native Gemini aspect-ratio parameter; omit it for image-to-image requests to follow the reference image automatically |
-| `imageConfig.imageSize` | Native Gemini resolution parameter: `1K` / `2K` / `4K`; the K must be uppercase |
-| `responseFormat.image` | Compatibility parameter for standard models only; copy the same `aspectRatio` and `imageSize` values here, but do not send it to a `-c` model |
-| `responseModalities` | `['IMAGE']` requests an image; the standard compatibility route also supports `['TEXT']` for a URL and `['IMAGE','TEXT']` for both; a native `-c` image part must be returned as `parts[].inlineData` |
-
-> For 2K or 4K output from a standard model, send both dimension groups. Sending only `responseFormat.image` may still produce the default 1K output—for example, 896x1200 at `3:4`.
-
-> For 2K or 4K output from a `-c` model, send only `imageConfig`. An HTTP 200 response after including `responseFormat` does not mean that this non-native field took effect.
-
-> Do not send `aspectRatio: "auto"`. Omit `aspectRatio` to use automatic sizing.
-
-## Supported ratios and pixels
-
-The table shows the target pixels when aspect-ratio and resolution parameters are honored correctly. A `-c` model must pass the dimension and response-structure checks below; HTTP 200 alone is not sufficient:
-
-| Ratio | 1K | 2K | 4K |
-| --- | --- | --- | --- |
-| `1:1` | 1024x1024 | 2048x2048 | 4096x4096 |
-| `16:9` | 1376x768 | 2752x1536 | 5504x3072 |
-| `9:16` | 768x1376 | 1536x2752 | 3072x5504 |
-| `4:3` | 1200x896 | 2400x1792 | 4800x3584 |
-| `3:4` | 896x1200 | 1792x2400 | 3584x4800 |
-| `3:2` | 1264x848 | 2528x1696 | 5056x3392 |
-| `2:3` | 848x1264 | 1696x2528 | 3392x5056 |
-| `5:4` | 1152x928 | 2304x1856 | 4608x3712 |
-| `4:5` | 928x1152 | 1856x2304 | 3712x4608 |
-| `21:9` | 1584x672 | 3168x1344 | 6336x2688 |
-
-Only the Flash family, `gemini-3.1-flash-image-preview` and `gemini-3.1-flash-image-preview-c`, supports ultra-wide and ultra-tall output: `8:1` = 2928x352, `4:1` = 2064x512, `1:4` = 512x2064, and `1:8` = 352x2928. Multiply each dimension by 2 or 4 for 2K or 4K.
-
-> The model can produce strong architecture, color, and composition, but long Chinese passages may still contain missing, incorrect, or reordered characters. Add body text in a design tool after generation instead of treating long text rendered inside an image as final copy.
-
-### Standard models: requesting 4K reliably
-
-This non-`-c` example uses `3:4`. Keep both parameter groups identical:
-
-```json
-{
-  "generationConfig": {
-    "responseModalities": ["IMAGE"],
-    "imageConfig": {
-      "aspectRatio": "3:4",
-      "imageSize": "4K"
-    },
-    "responseFormat": {
-      "image": {
-        "aspectRatio": "3:4",
-        "imageSize": "4K"
-      }
-    }
-  }
-}
-```
-
-For a standard model, `3:4 + 4K` should return 3584x4800. An actual result of 896x1200 means the request was still processed as 1K.
-
-### `-c` enterprise models: native 4K request
-
-For a `-c` model, keep only the native Gemini `imageConfig` field. The complete request body is:
-
-```bash
-curl -X POST "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview-c:generateContent" \
-  -H "x-goog-api-key: <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "contents": [{
-      "role": "user",
-      "parts": [{ "text": "Your prompt" }]
-    }],
-    "generationConfig": {
-      "responseModalities": ["IMAGE"],
-      "imageConfig": {
-        "aspectRatio": "3:4",
-        "imageSize": "4K"
-      }
-    }
-  }'
-```
-
-The core request body is:
+### Native text-to-image request
 
 ```json
 {
@@ -118,23 +134,31 @@ The core request body is:
     {
       "role": "user",
       "parts": [
-        { "text": "Your prompt" }
+        { "text": "A red apple on a wooden table, soft studio light, minimal background" }
       ]
     }
   ],
   "generationConfig": {
     "responseModalities": ["IMAGE"],
     "imageConfig": {
-      "aspectRatio": "3:4",
-      "imageSize": "4K"
+      "aspectRatio": "1:1",
+      "imageSize": "1K"
     }
   }
 }
 ```
 
-Do not add `generationConfig.responseFormat` to a `-c` request.
+OpenAI `size` and `response_format` fields do not belong in a native Gemini request. Use `generationConfig.imageConfig` for both ratio and resolution:
 
-A successful native response should contain an image part like this (the actual base64 data is omitted):
+| Field | Description |
+| --- | --- |
+| `responseModalities` | Use `['IMAGE']` to request an image. |
+| `imageConfig.aspectRatio` | An image ratio such as `1:1`, `16:9`, or `3:4`. Omit it when the ratio should be automatic. |
+| `imageConfig.imageSize` | A resolution tier such as `1K`, `2K`, or `4K`, subject to the current model and service configuration. |
+
+### Native response
+
+The image is normally returned in the `inlineData` node under `candidates[0].content.parts`:
 
 ```json
 {
@@ -155,24 +179,15 @@ A successful native response should contain an image part like this (the actual 
 }
 ```
 
-#### Validating native `-c` routing
+### Native examples by language
 
-Do not rely on the HTTP status alone. After deployment, `3:4 + 4K` must satisfy both assertions:
-
-1. The actual image dimensions are **3584x4800**.
-2. The image is returned at `candidates[].content.parts[].inlineData`, not as a Markdown data URL inside `parts[].text`.
-
-If the response is HTTP 200 but the image is still a landscape 1408x768 file and the response contains a Markdown data URL in `parts[].text`, the request is still reaching the old compatibility route. In that case, `imageConfig` and `responseModalities` are not being honored as native Gemini fields. Receiving HTTP 200 with or without `responseFormat` only means that the field was accepted or ignored; it does not prove that 4K took effect.
-
-## Quick start
-
-All seven language examples below use a **standard model**, so they send both `imageConfig` and `responseFormat.image`. To use a `-c` model, replace the model name in the URL and remove the entire `responseFormat` block.
+The examples below use `nano-banana-2`. To use Pro, replace the model name in the URL; the request body stays the same.
 
 <Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
 <Tab>
 
 ```bash
-curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent" \
+curl -X POST "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent" \
   -H "x-goog-api-key: <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -182,12 +197,7 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:gen
     }],
     "generationConfig": {
       "responseModalities": ["IMAGE"],
-      "imageConfig": {
-        "aspectRatio": "1:1", "imageSize": "1K"
-      },
-      "responseFormat": {
-        "image": { "aspectRatio": "1:1", "imageSize": "1K" }
-      }
+      "imageConfig": { "aspectRatio": "1:1", "imageSize": "1K" }
     }
   }'
 ```
@@ -195,14 +205,10 @@ curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:gen
 </Tab>
 <Tab>
 
-```bash
-pip install requests
-```
-
 ```python
 import requests
 
-url = "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"
+url = "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent"
 payload = {
     "contents": [{
         "role": "user",
@@ -211,9 +217,6 @@ payload = {
     "generationConfig": {
         "responseModalities": ["IMAGE"],
         "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"},
-        "responseFormat": {
-            "image": {"aspectRatio": "1:1", "imageSize": "1K"},
-        },
     },
 }
 
@@ -230,29 +233,26 @@ print(response.json())
 <Tab>
 
 ```javascript
-const url =
-  "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent";
-
-const response = await fetch(url, {
-  method: "POST",
-  headers: {
-    "x-goog-api-key": "<API_KEY>",
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    contents: [{
-      role: "user",
-      parts: [{ text: "A red apple on a wooden table, soft studio light, minimal background" }],
-    }],
-    generationConfig: {
-      responseModalities: ["IMAGE"],
-      imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
-      responseFormat: {
-        image: { aspectRatio: "1:1", imageSize: "1K" },
-      },
+const response = await fetch(
+  "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
+  {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": "<API_KEY>",
+      "Content-Type": "application/json",
     },
-  }),
-});
+    body: JSON.stringify({
+      contents: [{
+        role: "user",
+        parts: [{ text: "A red apple on a wooden table, soft studio light, minimal background" }],
+      }],
+      generationConfig: {
+        responseModalities: ["IMAGE"],
+        imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+      },
+    }),
+  },
+);
 
 console.log(await response.json());
 ```
@@ -262,20 +262,15 @@ console.log(await response.json());
 
 ```php
 <?php
-$url = "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent";
+$url = "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent";
 $payload = [
     "contents" => [[
         "role" => "user",
-        "parts" => [[
-            "text" => "A red apple on a wooden table, soft studio light, minimal background",
-        ]],
+        "parts" => [["text" => "A red apple on a wooden table, soft studio light, minimal background"]],
     ]],
     "generationConfig" => [
         "responseModalities" => ["IMAGE"],
         "imageConfig" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
-        "responseFormat" => [
-            "image" => ["aspectRatio" => "1:1", "imageSize" => "1K"],
-        ],
     ],
 ];
 
@@ -307,16 +302,18 @@ import (
 )
 
 func main() {
-    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"},"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}`)
-    url := "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"
-    req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+    body := []byte(`{"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"}}}`)
+    req, _ := http.NewRequest(
+        "POST",
+        "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
+        bytes.NewReader(body),
+    )
     req.Header.Set("x-goog-api-key", "<API_KEY>")
     req.Header.Set("Content-Type", "application/json")
 
     resp, err := http.DefaultClient.Do(req)
     if err != nil { panic(err) }
     defer resp.Body.Close()
-
     data, _ := io.ReadAll(resp.Body)
     fmt.Println(string(data))
 }
@@ -334,11 +331,11 @@ import java.net.http.HttpResponse;
 public class Main {
   public static void main(String[] args) throws Exception {
     String body = """
-      {"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"},"responseFormat":{"image":{"aspectRatio":"1:1","imageSize":"1K"}}}}
+      {"contents":[{"role":"user","parts":[{"text":"A red apple on a wooden table, soft studio light, minimal background"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"}}}
       """;
 
     HttpRequest request = HttpRequest.newBuilder()
-        .uri(URI.create("https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent"))
+        .uri(URI.create("https://api.klong.lat/v1beta/models/nano-banana-2:generateContent"))
         .header("x-goog-api-key", "<API_KEY>")
         .header("Content-Type", "application/json")
         .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -361,15 +358,13 @@ using var client = new HttpClient();
 client.DefaultRequestHeaders.Add("x-goog-api-key", "<API_KEY>");
 
 var response = await client.PostAsJsonAsync(
-    "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent",
+    "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
     new {
         contents = new[] {
             new {
                 role = "user",
                 parts = new[] {
-                    new {
-                        text = "A red apple on a wooden table, soft studio light, minimal background"
-                    }
+                    new { text = "A red apple on a wooden table, soft studio light, minimal background" }
                 }
             }
         },
@@ -377,9 +372,6 @@ var response = await client.PostAsJsonAsync(
             responseModalities = new[] { "IMAGE" },
             imageConfig = new {
                 aspectRatio = "1:1", imageSize = "1K"
-            },
-            responseFormat = new {
-                image = new { aspectRatio = "1:1", imageSize = "1K" }
             }
         }
     }
@@ -391,70 +383,60 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 </Tab>
 </Tabs>
 
-For the standard compatibility response, the image is typically returned at `candidates[0].content.parts[0].inline_data.data`. A native `-c` response must use `candidates[].content.parts[].inlineData.data`; if it returns only `parts[].text`, use the routing checks above.
+## Native Gemini image editing
 
-### Text to image - URL
+### Base64 input
 
-Set `responseModalities` to `["TEXT"]`. The URL is returned at `candidates[0].content.parts[1].file_data.file_uri`. Use `["IMAGE","TEXT"]` to return both base64 and a URL.
+Send text and `inlineData` in the same `parts` array. Native Gemini uses camelCase fields:
 
-### Image to image - base64 input
-
-Add an image part next to the text part in `parts`:
-
-```bash
-curl -X POST "https://api.klong.lat/v1beta/models/gemini-3-pro-image-preview:generateContent" \
-  -H "x-goog-api-key: <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "contents": [{
-      "role": "user",
-      "parts": [
-        { "text": "Convert this to Japanese watercolor while preserving the subject and composition" },
-        {
-          "inline_data": {
-            "mime_type": "image/png",
-            "data": "<BASE64>"
-          }
+```json
+{
+  "contents": [{
+    "role": "user",
+    "parts": [
+      { "text": "Restyle this as Japanese watercolor while preserving the subject and composition" },
+      {
+        "inlineData": {
+          "mimeType": "image/png",
+          "data": "<BASE64>"
         }
-      ]
-    }],
-    "generationConfig": {
-      "responseModalities": ["IMAGE"]
-    }
-  }'
-```
-
-### Image to image - URL input
-
-Replace `inline_data` above with:
-
-```json
-{
-  "file_data": {
-    "mime_type": "image/png",
-    "file_uri": "https://example.com/input.png"
-  }
-}
-```
-
-### Follow the reference ratio at 2K
-
-For a standard model, set only `imageSize` in both locations and omit `aspectRatio`:
-
-```json
-{
+      }
+    ]
+  }],
   "generationConfig": {
     "responseModalities": ["IMAGE"],
-    "imageConfig": {
-      "imageSize": "2K"
-    },
-    "responseFormat": {
-      "image": { "imageSize": "2K" }
-    }
+    "imageConfig": { "imageSize": "2K" }
   }
 }
 ```
 
-For a `-c` model, remove `responseFormat` and keep only `imageConfig.imageSize`.
+### URL input
 
-When both `aspectRatio` and `imageSize` are omitted, the upstream service determines the reference ratio and output tier. For text-to-image requests that need a fixed shape, pass both the ratio and resolution.
+If the service allows remote image input, use `fileData`:
+
+```json
+{
+  "fileData": {
+    "mimeType": "image/png",
+    "fileUri": "https://example.com/input.png"
+  }
+}
+```
+
+Omit `imageConfig.aspectRatio` to let the service follow the reference image ratio; pass it when a fixed ratio is needed.
+
+## Common questions
+
+### Can I mix OpenAI and Gemini fields?
+
+No. The OpenAI-compatible endpoint uses `model`, `prompt`, `size`, and `response_format`. The native Gemini endpoint uses `contents`, `generationConfig.responseModalities`, and `generationConfig.imageConfig`. The model can be the same, but the request body must match the endpoint.
+
+### Which model should I choose?
+
+Start with `nano-banana-2` to verify the request and product flow. To use Pro, change the model ID to `nano-banana-pro`; keep the other fields unchanged. Actual speed, quota, and available sizes depend on the current service configuration.
+
+### Where is the image in the response?
+
+For native Gemini, check `candidates[].content.parts[].inlineData.data` and use its `mimeType` to build a data URL. For the OpenAI-compatible endpoint, read `data[0].url` or `data[0].b64_json`.
+
+Long text rendered inside an image can still contain missing, incorrect, or reordered characters. Use generated images for visual composition; add exact headings, clauses, or body copy in a design tool afterward.
