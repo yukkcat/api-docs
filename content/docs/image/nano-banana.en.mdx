@@ -126,6 +126,8 @@ Content-Type: application/json
 
 Replace `{model}` with `nano-banana-2` or `nano-banana-pro`. Native Gemini requests use `generationConfig.imageConfig` for ratio and resolution.
 
+If enabled by the current service, `Authorization: Bearer <API_KEY>` may also be accepted. Send only one authentication header per request; follow the service configuration.
+
 ### Native text-to-image request
 
 ```json
@@ -150,11 +152,63 @@ Replace `{model}` with `nano-banana-2` or `nano-banana-pro`. Native Gemini reque
 
 OpenAI `size` and `response_format` fields do not belong in a native Gemini request. Use `generationConfig.imageConfig` for both ratio and resolution:
 
+Some reference documents use `generationConfig.responseFormat.image`; that is a different service-version convention. This service currently handles native requests through `generationConfig.imageConfig`. Do not put both field sets in one request; the deployed service is authoritative.
+
 | Field | Description |
 | --- | --- |
 | `responseModalities` | Use `['IMAGE']` to request an image. |
 | `imageConfig.aspectRatio` | An image ratio such as `1:1`, `16:9`, or `3:4`. Omit it when the ratio should be automatic. |
 | `imageConfig.imageSize` | A resolution tier such as `1K`, `2K`, or `4K`, subject to the current model and service configuration. |
+
+Some upstream deployments also expose ultra-wide ratios such as `8:1`, `4:1`, `1:4`, and `1:8`. They are not enabled for every model or deployment; use them only when the service explicitly supports them and the request succeeds. On `400`, fall back to one of the common ratios above.
+
+Common reference implementations use the following 1K dimensions. If the service scales the same ratio, 2K and 4K are often approximately 2x and 4x these values, but the actual response dimensions are authoritative:
+
+| Ratio | Reference 1K size |
+| --- | --- |
+| `8:1` | 2928×352 |
+| `4:1` | 2064×512 |
+| `1:4` | 512×2064 |
+| `1:8` | 352×2928 |
+
+`imageSize` must use uppercase `1K`, `2K`, or `4K`. Omit both `aspectRatio` and `imageSize` to let the upstream choose. Do not send `aspectRatio: "auto"`; omit the field when the ratio should be automatic.
+
+### Native response modes
+
+`responseModalities` specifies which content types the response may contain:
+
+| Value | Common result | Notes |
+| --- | --- | --- |
+| `['IMAGE']` | `inlineData` (Base64) | Recommended for native image responses on this page. |
+| `['TEXT']` | `fileData.fileUri` or text | Only available when URL/text conversion is enabled by the service; do not assume every deployment supports it. |
+| `['IMAGE', 'TEXT']` | Image plus URL/text | Mixed output also depends on the service configuration. |
+
+Read `candidates[].content.parts[]` by field instead of assuming a fixed array index. A response may contain text before the image. The common fields are:
+
+| Response field | Use |
+| --- | --- |
+| `inlineData.mimeType` + `inlineData.data` | Build `data:{mimeType};base64,{data}` to display or save the image. |
+| `fileData.fileUri` | Read a service-generated image URL, when URL output is enabled. |
+| `text` | Model-generated text; it does not necessarily contain an image. |
+
+> Unless the service explicitly enables `TEXT` or mixed output, use `['IMAGE']` and treat the presence of `inlineData` as the success signal. Native requests use `imageConfig` only; do not add OpenAI `response_format` or `responseFormat` fields.
+
+### Aspect ratio and resolution quick reference
+
+The following are common target pixels for Gemini image models. The actual dimensions remain subject to the selected model and service configuration:
+
+| Ratio | 1K | 2K | 4K |
+| --- | --- | --- | --- |
+| `1:1` | 1024×1024 | 2048×2048 | 4096×4096 |
+| `16:9` | 1376×768 | 2752×1536 | 5504×3072 |
+| `9:16` | 768×1376 | 1536×2752 | 3072×5504 |
+| `4:3` | 1200×896 | 2400×1792 | 4800×3584 |
+| `3:4` | 896×1200 | 1792×2400 | 3584×4800 |
+| `3:2` | 1264×848 | 2528×1696 | 5056×3392 |
+| `2:3` | 848×1264 | 1696×2528 | 3392×5056 |
+| `5:4` | 1152×928 | 2304×1856 | 4608×3712 |
+| `4:5` | 928×1152 | 1856×2304 | 3712×4608 |
+| `21:9` | 1584×672 | 3168×1344 | 6336×2688 |
 
 ### Native response
 
@@ -416,12 +470,26 @@ If the service allows remote image input, use `fileData`:
 
 ```json
 {
-  "fileData": {
-    "mimeType": "image/png",
-    "fileUri": "https://example.com/input.png"
+  "contents": [{
+    "role": "user",
+    "parts": [
+      { "text": "Restyle this as Japanese watercolor while preserving the subject and composition" },
+      {
+        "fileData": {
+          "mimeType": "image/png",
+          "fileUri": "https://example.com/input.png"
+        }
+      }
+    ]
+  }],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": { "imageSize": "2K" }
   }
 }
 ```
+
+`inlineData` and `fileData` are both image parts and may be mixed in the order used in `contents[].parts[]` when the service supports it. A remote URL must be reachable by the service. The commonly cited limit of 14 reference images is not a fixed promise of this endpoint; use the limit configured for the current model and service, and treat the actual error response as authoritative.
 
 Omit `imageConfig.aspectRatio` to let the service follow the reference image ratio; pass it when a fixed ratio is needed.
 

@@ -126,6 +126,8 @@ Content-Type: application/json
 
 把 `{model}` 替换为 `nano-banana-2` 或 `nano-banana-pro`。比例与分辨率统一放在 `generationConfig.imageConfig` 中。
 
+如果当前服务配置允许，也可以用 `Authorization: Bearer <API_KEY>` 认证；同一个请求只保留一种认证头，具体以服务端配置为准。
+
 ### 原生文生图请求
 
 ```json
@@ -150,11 +152,63 @@ Content-Type: application/json
 
 OpenAI 的 `size` 和 `response_format` 不属于 Gemini 原生请求。Gemini 图像参数如下：
 
+有些参考文档会使用 `generationConfig.responseFormat.image`，那是另一种服务版本的写法。本服务当前按原生 `generationConfig.imageConfig` 处理；不要把两套字段同时放进同一个请求，实际部署行为以服务端为准。
+
 | 字段 | 说明 |
 | --- | --- |
 | `responseModalities` | 返回图片时传 `['IMAGE']`。 |
 | `imageConfig.aspectRatio` | 图片比例，例如 `1:1`、`16:9`、`3:4`。不需要固定比例时省略。 |
 | `imageConfig.imageSize` | 分辨率档位，例如 `1K`、`2K`、`4K`；以当前模型和服务端支持范围为准。 |
+
+### 返回模式
+
+`responseModalities` 决定响应中希望得到的内容类型：
+
+| 值 | 常见结果 | 说明 |
+| --- | --- | --- |
+| `['IMAGE']` | `inlineData`（Base64） | 当前文档推荐的图片返回方式。 |
+| `['TEXT']` | `fileData.fileUri` 或文本 | 只有服务端启用 URL/文本转换时才可用，不能假设所有部署都支持。 |
+| `['IMAGE', 'TEXT']` | 图片和 URL/文本同时返回 | 同样取决于服务端是否启用混合返回。 |
+
+原生图片响应优先读取 `candidates[].content.parts[]`，不要只按数组下标读取：响应中可能先出现文字说明，再出现图片。常用字段如下：
+
+| 响应字段 | 用途 |
+| --- | --- |
+| `inlineData.mimeType` + `inlineData.data` | 拼接 `data:{mimeType};base64,{data}`，直接显示或保存。 |
+| `fileData.fileUri` | 读取服务端返回的图片 URL（如果当前部署支持 URL 返回）。 |
+| `text` | 模型返回的文字说明，不一定包含图片。 |
+
+> 当前服务未明确开启 `TEXT` 或混合返回时，请固定使用 `['IMAGE']`，并以 `inlineData` 是否存在判断是否成功。原生请求只写 `imageConfig`；不要添加 OpenAI 的 `response_format` 或 `responseFormat` 字段。
+
+### 比例与分辨率速查
+
+下面是 Gemini 图像模型常见的目标像素，实际结果仍以当前模型和服务端返回的图片尺寸为准：
+
+| 比例 | 1K | 2K | 4K |
+| --- | --- | --- | --- |
+| `1:1` | 1024×1024 | 2048×2048 | 4096×4096 |
+| `16:9` | 1376×768 | 2752×1536 | 5504×3072 |
+| `9:16` | 768×1376 | 1536×2752 | 3072×5504 |
+| `4:3` | 1200×896 | 2400×1792 | 4800×3584 |
+| `3:4` | 896×1200 | 1792×2400 | 3584×4800 |
+| `3:2` | 1264×848 | 2528×1696 | 5056×3392 |
+| `2:3` | 848×1264 | 1696×2528 | 3392×5056 |
+| `5:4` | 1152×928 | 2304×1856 | 4608×3712 |
+| `4:5` | 928×1152 | 1856×2304 | 3712×4608 |
+| `21:9` | 1584×672 | 3168×1344 | 6336×2688 |
+
+`imageSize` 必须使用大写的 `1K`、`2K` 或 `4K`。`aspectRatio` 和 `imageSize` 都省略时，由上游自行决定；文生图建议显式填写两者。不要传 `aspectRatio: "auto"`，需要自动比例时直接省略字段。
+
+部分上游还提供 `8:1`、`4:1`、`1:4`、`1:8` 这类超宽比例。它们并非所有模型或部署都开放；只有在服务端明确支持并且实际返回成功时才使用，遇到 `400` 时请改用上面的通用比例。
+
+参考实现常见的 1K 尺寸如下；如果服务端按同一比例放大，2K、4K 通常约为下表的 2 倍、4 倍，但最终像素仍以实际响应为准：
+
+| 比例 | 参考 1K 尺寸 |
+| --- | --- |
+| `8:1` | 2928×352 |
+| `4:1` | 2064×512 |
+| `1:4` | 512×2064 |
+| `1:8` | 352×2928 |
 
 ### 原生响应
 
@@ -416,12 +470,26 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 
 ```json
 {
-  "fileData": {
-    "mimeType": "image/png",
-    "fileUri": "https://example.com/input.png"
+  "contents": [{
+    "role": "user",
+    "parts": [
+      { "text": "改成日系水彩风，保留主体和构图" },
+      {
+        "fileData": {
+          "mimeType": "image/png",
+          "fileUri": "https://example.com/input.png"
+        }
+      }
+    ]
+  }],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": { "imageSize": "2K" }
   }
 }
 ```
+
+`inlineData` 和 `fileData` 都是图片 part，可以按 `contents[].parts[]` 中的顺序混合传入；远程 URL 必须能被服务端访问。参考资料常见的“最多 14 张”不是本接口的固定承诺，图片数量上限以当前模型、服务端配置和实际错误响应为准。
 
 省略 `imageConfig.aspectRatio` 时，服务端可以根据参考图决定比例；需要固定比例时再传 `aspectRatio`。
 
