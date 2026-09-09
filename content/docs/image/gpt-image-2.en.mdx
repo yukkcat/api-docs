@@ -1,11 +1,11 @@
 ---
-title: GPT Image 2
-description: OpenAI Images API-compatible image generation and editing
+title: GPT Image 2 / 2.5
+description: GPT-Image and official-channel models, exact sizing, generation, and editing
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
-<img src="/gpt-avatar.svg" alt="GPT Image 2 illustration" width="220" />
+<img src="/gpt-avatar.svg" alt="GPT Image illustration" width="220" />
 
 Set `base_url` to `https://api.klong.lat/v1` and use the official SDK directly.
 
@@ -17,26 +17,53 @@ POST https://api.klong.lat/v1/images/edits         # Image editing (multipart/fo
 Authorization: Bearer <API_KEY>
 ```
 
-## Models and quality
+## Models and channels
+
+This page separates GPT-Image, VIP, High, and official channels. VIP and High are image-generation channels, while the official channel provides Flare and Sunburst separately. In particular, `gpt-image-2.5-flare` and `gpt-image-2.5-sunburst` are equivalent aliases on the GPT-Image channel; only the official channel distinguishes speed-first Flare from precision-first Sunburst. Follow the channel shown and assigned in the API Console.
+
+### GPT-Image channel
 
 | Model | Usage |
 | --- | --- |
-| `gpt-image-2` | Default model; supports 1K only |
-| `gpt-image-2-exact` | Exact-size model with up to 4K output; `size` enforces the final pixel dimensions using high-quality Lanczos cover resizing and center cropping |
-| `gpt-image-2-vip` | `quality` is fixed to `medium`; supports 1K / 2K / 4K |
-| `gpt-image-2-high` | Supports `quality=medium` and `quality=high`; supports 1K / 2K / 4K |
-| `gpt-image-2-c` | Enterprise model with 100% success rate; uses the same request format and supports 1K / 2K / 4K |
+| `gpt-image-2` | Standard model |
+| `gpt-image-2.5` | Same capability as `gpt-image-2` |
+| `gpt-image-2.5-flare` | Equivalent alias on this channel; no separate speed tier |
+| `gpt-image-2.5-sunburst` | Equivalent alias on this channel; no separate precision tier |
+| `gpt-image-2-exact` | Exact-size variant that enforces the requested pixel dimensions through `size` |
+| `gpt-image-2.5-exact` | Same exact-size capability as `gpt-image-2-exact` |
 
-All five models use the same generation and editing endpoints.
+This channel supports 1K / 2K / 4K upscaling and high concurrency, with a channel concurrency limit of 20,000. The price is ¥0.02 per image; after a ¥100 prepaid or cumulative spend, contact the service provider to request ¥0.01 per image. Actual throughput and availability depend on the upstream website, accounts, and network: upstream incidents may also cause failures or delays here.
+
+Standard models treat `size` as a target, but the final pixels are not guaranteed to match it exactly. For example, a `1024x1024` request may return `1250x1250`, or a nearby size such as `1249x1251` because of pixel drift.
+
+The `-exact` variants apply high-quality proportional Lanczos resizing and center cropping after generation, then enforce the requested dimensions. A `1024x1024` request therefore returns exactly `1024x1024`. Exact size guarantees width and height, not composition: a large aspect-ratio mismatch can crop the image, and some unusual ratios may look visually stretched.
+
+### VIP / High image channels
+
+| Channel | Model | Resolution | `quality` | Description |
+| --- | --- | --- | --- | --- |
+| VIP image channel | `gpt-image-2-vip` | 1K / 2K / native 4K | Fixed to `medium` | Generates native 4K directly; intended for routine image tasks at a fixed medium quality |
+| High image channel | `gpt-image-2-high` | 1K / 2K / native 4K | `medium` / `high` | Generates native 4K directly; intended for medium- or high-quality tasks |
+
+VIP and High are both image-generation channels, and both can generate native 4K directly rather than through post-generation 4K upscaling. They use the same generation and editing request formats as the other models; only `model` changes. Neither channel is part of the official channel below. Availability and pricing follow the current API Console configuration.
+
+### Official channel
+
+| Model | Best for |
+| --- | --- |
+| `gpt-image-2.5-flare` | Speed-first generation for everyday images, social media, web assets, and batches |
+| `gpt-image-2.5-sunburst` | Precision-first generation for advertising, product imagery, complex edits, and final delivery |
+
+Both official-channel models support 1K / 2K / 4K and `quality=low`, `medium`, `high`, `xhigh`, or `max`. The Flare / Sunburst distinction applies only to the official channel.
 
 ## Parameters
 
 | Parameter | Required | Description |
 | --- | --- | --- |
-| `model` | Yes | A model name from the table above |
+| `model` | Yes | A model name from the tables above; behavior for the same ID depends on the active channel |
 | `prompt` | Yes | Prompt text in English or Chinese |
-| `size` | No | `widthxheight` in pixels, such as `1024x1024` or `3840x2160`; `gpt-image-2-exact` returns the exact requested dimensions |
-| `quality` | No | `gpt-image-2-high` supports `medium` / `high`; `gpt-image-2-vip` is fixed to `medium` |
+| `size` | No | `widthxheight` in pixels, such as `1024x1024` or `3840x2160`; both `-exact` variants return the exact requested dimensions |
+| `quality` | No | VIP is fixed to `medium`; High supports `medium` / `high`; the official channel supports `low` / `medium` / `high` / `xhigh` / `max` |
 | `n` | No | Number of images to generate; default: `1` |
 | `response_format` | No | `url` (default) or `b64_json` |
 | `stream` | No | With `true`, progress is sent over the current SSE connection |
@@ -209,9 +236,9 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 </Tab>
 </Tabs>
 
-### Exact-size model - `gpt-image-2-exact`
+### Exact-size models - `-exact`
 
-Use `gpt-image-2-exact` when the image must match specific pixel dimensions:
+Use `gpt-image-2-exact` or `gpt-image-2.5-exact` when an image must match specific pixel dimensions:
 
 ```bash
 curl https://api.klong.lat/v1/images/generations \
@@ -224,27 +251,33 @@ curl https://api.klong.lat/v1/images/generations \
   }'
 ```
 
-The returned image is strictly `3840x2160`. The model supports output up to 4K; for explicit pixel sizes, each edge must be between `64` and `4096` pixels and the total pixel count must not exceed `4096x4096`.
+The returned image is strictly `3840x2160`. Both exact-size variants support output up to 4K; for explicit pixel sizes, each edge must be between `64` and `4096` pixels and the total pixel count must not exceed `4096x4096`.
 
-The service applies high-quality proportional Lanczos cover resizing, then center-crops the image to the target dimensions. When the source and target aspect ratios differ, a small area around the edges may be cropped; keep important subjects and text inside the central safe area.
+The service applies high-quality proportional Lanczos cover resizing, then center-crops the image to the target dimensions. When source and target aspect ratios differ, content around the edges may be cropped; some unusual ratios may also look visually stretched. Keep important subjects and text inside the central safe area.
 
-### High quality - `gpt-image-2-high`
+### VIP, High, and official-channel quality levels
 
-Set `quality` to `medium` or `high` when using `gpt-image-2-high`:
+| Channel | Available `quality` values |
+| --- | --- |
+| VIP image channel (native up to 4K) | Fixed to `medium` |
+| High image channel (native up to 4K) | `medium`, `high` |
+| Official Flare / Sunburst | `low`, `medium`, `high`, `xhigh`, `max` |
+
+For example, use official-channel Sunburst for a final-delivery image:
 
 ```bash
 curl https://api.klong.lat/v1/images/generations \
   -H "Authorization: Bearer <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-image-2-high",
+    "model": "gpt-image-2.5-sunburst",
     "prompt": "Premium perfume campaign, black background, rim lighting, commercial photography",
     "size": "3840x2160",
-    "quality": "high"
+    "quality": "xhigh"
   }'
 ```
 
-The generation, editing, and multi-image examples can use any other model by changing `model`.
+For everyday or batch generation, change the model to `gpt-image-2.5-flare`. The generation, editing, and multi-image request formats remain the same.
 
 ### Generate multiple images - `n`
 

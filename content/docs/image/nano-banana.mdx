@@ -1,6 +1,6 @@
 ---
 title: Nano Banana
-description: nano-banana-2 与 nano-banana-pro 的 OpenAI 兼容和 Gemini 原生图像接口
+description: nano-banan2 与 nano-banana-pro 的 OpenAI 兼容和 Gemini 原生图像接口
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
@@ -13,7 +13,7 @@ Nano Banana 支持两套请求格式：OpenAI 兼容的 Images API，以及 Gemi
 
 | 模型 | 说明 |
 | --- | --- |
-| `nano-banana-2` | Nano Banana 新版模型，支持 OpenAI Images API 和 Gemini 原生格式。 |
+| `nano-banan2` | Nano Banana 2 模型，支持 OpenAI Images API 和 Gemini 原生格式。 |
 | `nano-banana-pro` | Nano Banana Pro 模型，支持 OpenAI Images API 和 Gemini 原生格式。 |
 | `gemini-3.1-flash-image-preview` | 兼容模型，按本页 Gemini 原生格式调用；可用能力以服务端配置为准。 |
 | `gemini-3-pro-image-preview` | 兼容模型，按本页 Gemini 原生格式调用；可用能力以服务端配置为准。 |
@@ -41,7 +41,7 @@ Content-Type: application/json
 
 ```json
 {
-  "model": "nano-banana-2",
+  "model": "nano-banan2",
   "prompt": "木桌上的红苹果，柔和棚拍光线，极简背景",
   "size": "1024x1024",
   "response_format": "url"
@@ -61,7 +61,7 @@ Content-Type: multipart/form-data
 ```bash
 curl -X POST "https://api.klong.lat/v1/images/edits" \
   -H "Authorization: Bearer <API_KEY>" \
-  -F "model=nano-banana-2" \
+  -F "model=nano-banan2" \
   -F "prompt=改成日系水彩风，保留主体和构图" \
   -F "response_format=url" \
   -F "image=@input.png"
@@ -83,7 +83,7 @@ client = OpenAI(
 )
 
 result = client.images.generate(
-    model="nano-banana-2",
+    model="nano-banan2",
     prompt="木桌上的红苹果，柔和棚拍光线，极简背景",
     size="1024x1024",
 )
@@ -103,7 +103,7 @@ const client = new OpenAI({
 });
 
 const result = await client.images.generate({
-  model: "nano-banana-2",
+  model: "nano-banan2",
   prompt: "木桌上的红苹果，柔和棚拍光线，极简背景",
   size: "1024x1024",
 });
@@ -124,7 +124,7 @@ x-goog-api-key: <API_KEY>
 Content-Type: application/json
 ```
 
-把 `{model}` 替换为 `nano-banana-2` 或 `nano-banana-pro`。比例与分辨率统一放在 `generationConfig.imageConfig` 中。
+把 `{model}` 替换为 `nano-banan2` 或 `nano-banana-pro`。比例与分辨率统一放在 `generationConfig.imageConfig` 中。
 
 如果当前服务配置允许，也可以用 `Authorization: Bearer <API_KEY>` 认证；同一个请求只保留一种认证头，具体以服务端配置为准。
 
@@ -235,13 +235,13 @@ OpenAI 的 `size` 和 `response_format` 不属于 Gemini 原生请求。Gemini �
 
 ### 各语言原生示例
 
-下面的示例都使用 `nano-banana-2`。使用 Pro 时，只替换 URL 中的模型名；请求体不变。
+下面的示例都使用 `nano-banan2`。使用 Pro 时，只替换 URL 中的模型名；请求体不变。
 
 <Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
 <Tab>
 
 ```bash
-curl -X POST "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent" \
+curl -X POST "https://api.klong.lat/v1beta/models/nano-banan2:generateContent" \
   -H "x-goog-api-key: <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -262,7 +262,7 @@ curl -X POST "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent"
 ```python
 import requests
 
-url = "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent"
+url = "https://api.klong.lat/v1beta/models/nano-banan2:generateContent"
 payload = {
     "contents": [{
         "role": "user",
@@ -288,7 +288,7 @@ print(response.json())
 
 ```javascript
 const response = await fetch(
-  "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
+  "https://api.klong.lat/v1beta/models/nano-banan2:generateContent",
   {
     method: "POST",
     headers: {
@@ -316,7 +316,7 @@ console.log(await response.json());
 
 ```php
 <?php
-$url = "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent";
+$url = "https://api.klong.lat/v1beta/models/nano-banan2:generateContent";
 $payload = [
     "contents" => [[
         "role" => "user",
@@ -359,7 +359,7 @@ func main() {
     body := []byte(`{"contents":[{"role":"user","parts":[{"text":"木桌上的红苹果，柔和棚拍光线，极简背景"}]}],"generationConfig":{"responseModalities":["IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"1K"}}}`)
     req, _ := http.NewRequest(
         "POST",
-        "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
+        "https://api.klong.lat/v1beta/models/nano-banan2:generateContent",
         bytes.NewReader(body),
     )
     req.Header.Set("x-goog-api-key", "<API_KEY>")
@@ -389,7 +389,7 @@ public class Main {
       """;
 
     HttpRequest request = HttpRequest.newBuilder()
-        .uri(URI.create("https://api.klong.lat/v1beta/models/nano-banana-2:generateContent"))
+        .uri(URI.create("https://api.klong.lat/v1beta/models/nano-banan2:generateContent"))
         .header("x-goog-api-key", "<API_KEY>")
         .header("Content-Type", "application/json")
         .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -412,7 +412,7 @@ using var client = new HttpClient();
 client.DefaultRequestHeaders.Add("x-goog-api-key", "<API_KEY>");
 
 var response = await client.PostAsJsonAsync(
-    "https://api.klong.lat/v1beta/models/nano-banana-2:generateContent",
+    "https://api.klong.lat/v1beta/models/nano-banan2:generateContent",
     new {
         contents = new[] {
             new {
@@ -499,9 +499,9 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 
 不能直接混用字段。OpenAI 兼容入口使用 `model`、`prompt`、`size` 和 `response_format`；Gemini 原生入口使用 `contents`、`generationConfig.responseModalities` 和 `generationConfig.imageConfig`。模型可以相同，但请求体要按入口书写。
 
-### `nano-banana-2` 和 `nano-banana-pro` 怎么选？
+### `nano-banan2` 和 `nano-banana-pro` 怎么选？
 
-先使用 `nano-banana-2` 验证请求格式和业务流程；需要使用 Pro 模型时把模型名替换为 `nano-banana-pro`，其他字段保持不变。具体速度、额度和可用尺寸以服务端当前配置为准。
+先使用 `nano-banan2` 验证请求格式和业务流程；需要使用 Pro 模型时把模型名替换为 `nano-banana-pro`，其他字段保持不变。具体速度、额度和可用尺寸以服务端当前配置为准。
 
 ### 为什么看不到图片？
 

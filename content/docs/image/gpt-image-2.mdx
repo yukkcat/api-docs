@@ -1,11 +1,11 @@
 ---
-title: GPT Image 2
-description: OpenAI Images API 兼容的文生图与图像编辑接口
+title: GPT Image 2 / 2.5
+description: GPT-Image 与官方渠道的模型区别、精确尺寸及图像生成接口
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
-<img src="/gpt-avatar.svg" alt="GPT Image 2 插画" width="220" />
+<img src="/gpt-avatar.svg" alt="GPT Image 插画" width="220" />
 
 把 `base_url` 换成 `https://api.klong.lat/v1`，官方 SDK 直接用。
 
@@ -17,26 +17,53 @@ POST https://api.klong.lat/v1/images/edits         # 图像编辑 (multipart/for
 Authorization: Bearer <API_KEY>
 ```
 
-## 模型与质量
+## 模型与渠道
+
+本页按 GPT-Image、VIP、High 和官方渠道分别说明。VIP 和 High 都属于画图渠道；官方渠道单独提供 Flare 与 Sunburst。尤其要注意，同名的 `gpt-image-2.5-flare` 和 `gpt-image-2.5-sunburst` 在 GPT-Image 渠道中只是别名，只有在官方渠道中才分别代表速度优先和精度优先。实际使用哪个渠道，以 API 控制台当前显示和分配为准。
+
+### GPT-Image 渠道
 
 | 模型 | 调用说明 |
 | --- | --- |
-| `gpt-image-2` | 默认模型，仅支持 1K |
-| `gpt-image-2-exact` | 精确尺寸模型，最高支持 4K；可按 `size` 强制输出指定像素尺寸，使用高质量 Lanczos 等比缩放与居中裁切 |
-| `gpt-image-2-vip` | `quality` 固定为 `medium`，支持 1K / 2K / 4K |
-| `gpt-image-2-high` | 支持 `quality=medium` 和 `quality=high`，支持 1K / 2K / 4K |
-| `gpt-image-2-c` | 企业级模型，100% 成功率；与其他模型使用相同的调用格式，支持 1K / 2K / 4K |
+| `gpt-image-2` | 标准模型 |
+| `gpt-image-2.5` | 与 `gpt-image-2` 使用相同能力 |
+| `gpt-image-2.5-flare` | 在本渠道中是同能力别名，不区分速度档 |
+| `gpt-image-2.5-sunburst` | 在本渠道中是同能力别名，不区分精度档 |
+| `gpt-image-2-exact` | 精确尺寸版本，支持按 `size` 强制输出指定像素尺寸 |
+| `gpt-image-2.5-exact` | 与 `gpt-image-2-exact` 使用相同的精确尺寸能力 |
 
-五个模型都通过同一组文生图与图像编辑接口调用。
+该渠道支持 1K / 2K / 4K 超分和高并发，渠道并发上限为 20,000。价格为 ¥0.02/张；预充或累计消费达到 ¥100，可联系服务方调整为 ¥0.01/张。实际吞吐与可用性依赖上游官网、账号和网络状态：官网稳定时通常稳定，官网异常时也可能出现失败或延迟。
+
+普通模型会把 `size` 作为目标尺寸传给上游，但不保证最终像素完全一致。例如请求 `1024x1024`，实际图片可能是 `1250x1250`，也可能出现 `1249x1251` 这样的像素漂移。
+
+`-exact` 模型会在生成后使用高质量 Lanczos 等比缩放和居中裁切，把最终图片校正为请求的像素尺寸。例如请求 `1024x1024`，最终会严格得到 `1024x1024`。精确尺寸只保证宽和高；当生成结果与目标比例差异较大时，画面可能被裁切，部分特殊比例也可能出现视觉拉伸。
+
+### VIP / High 画图渠道
+
+| 渠道 | 模型 | 分辨率 | `quality` | 说明 |
+| --- | --- | --- | --- | --- |
+| VIP 画图渠道 | `gpt-image-2-vip` | 1K / 2K / 原生 4K | 固定为 `medium` | 支持直接生成原生 4K，适合固定中等质量的常规画图任务 |
+| High 画图渠道 | `gpt-image-2-high` | 1K / 2K / 原生 4K | `medium` / `high` | 支持直接生成原生 4K，适合需要中等或高质量的任务 |
+
+VIP 和 High 都是画图渠道，并且可以直接生成原生 4K，不是生成后再做 4K 超分。它们与其他模型使用相同的文生图、图像编辑请求格式，只需要更换 `model`；这两个渠道不属于下面的官方渠道，可用性和计费以 API 控制台当前配置为准。
+
+### 官方渠道
+
+| 模型 | 取向 |
+| --- | --- |
+| `gpt-image-2.5-flare` | 速度优先，适合日常出图、社交媒体、网页素材和批量生成 |
+| `gpt-image-2.5-sunburst` | 精度优先，更适合广告图、产品图、复杂编辑和最终交付 |
+
+两个官方渠道模型都支持 1K / 2K / 4K，并支持 `quality=low`、`medium`、`high`、`xhigh`、`max`。这里的 Flare / Sunburst 差异只适用于官方渠道。
 
 ## 参数
 
 | 参数 | 必填 | 说明 |
 | --- | --- | --- |
-| `model` | 是 | 上表中的模型名 |
+| `model` | 是 | 上表中的模型名；同名模型的实际能力取决于当前渠道 |
 | `prompt` | 是 | 提示词，中英文皆可 |
-| `size` | 否 | `宽x高` 像素，如 `1024x1024`、`3840x2160`；`gpt-image-2-exact` 会严格按该尺寸输出 |
-| `quality` | 否 | `gpt-image-2-high` 支持 `medium` / `high`；`gpt-image-2-vip` 固定为 `medium` |
+| `size` | 否 | `宽x高` 像素，如 `1024x1024`、`3840x2160`；两个 `-exact` 模型会严格按该尺寸输出 |
+| `quality` | 否 | VIP 固定为 `medium`；High 支持 `medium` / `high`；官方渠道支持 `low` / `medium` / `high` / `xhigh` / `max` |
 | `n` | 否 | 一次出几张，默认 `1` |
 | `response_format` | 否 | `url`（默认）或 `b64_json` |
 | `stream` | 否 | `true` 时通过当前 SSE 连接持续返回进度 |
@@ -209,9 +236,9 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 </Tab>
 </Tabs>
 
-### 精确尺寸模型 · `gpt-image-2-exact`
+### 精确尺寸模型 · `-exact`
 
-需要图片严格符合指定像素尺寸时，使用 `gpt-image-2-exact`：
+需要图片严格符合指定像素尺寸时，使用 `gpt-image-2-exact` 或 `gpt-image-2.5-exact`：
 
 ```bash
 curl https://api.klong.lat/v1/images/generations \
@@ -224,27 +251,33 @@ curl https://api.klong.lat/v1/images/generations \
   }'
 ```
 
-返回图片的最终尺寸会严格为 `3840x2160`。该模型最高支持 4K 输出；显式像素尺寸的宽、高需在 `64`～`4096` 之间，总像素不得超过 `4096x4096`。
+返回图片的最终尺寸会严格为 `3840x2160`。两个精确尺寸模型最高支持 4K 输出；显式像素尺寸的宽、高需在 `64`～`4096` 之间，总像素不得超过 `4096x4096`。
 
-服务会先对图片进行高质量 Lanczos 等比覆盖缩放，再从中心裁切到目标尺寸。原图与目标图宽高比不同时，四周可能被裁掉少量内容，建议把主体和文字放在画面中央的安全区域。
+服务会先对图片进行高质量 Lanczos 等比覆盖缩放，再从中心裁切到目标尺寸。原图与目标图宽高比不同时，四周可能被裁掉内容；部分特殊比例也可能产生视觉拉伸。建议把主体和文字放在画面中央的安全区域。
 
-### 高质量模型 · `gpt-image-2-high`
+### VIP、High 与官方渠道的质量档位
 
-使用 `gpt-image-2-high` 时可指定 `medium` 或 `high`：
+| 渠道 | 可用 `quality` |
+| --- | --- |
+| VIP 画图渠道（原生最高 4K） | 固定为 `medium` |
+| High 画图渠道（原生最高 4K） | `medium`、`high` |
+| 官方 Flare / Sunburst | `low`、`medium`、`high`、`xhigh`、`max` |
+
+例如，使用官方渠道的 Sunburst 生成最终交付图：
 
 ```bash
 curl https://api.klong.lat/v1/images/generations \
   -H "Authorization: Bearer <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-image-2-high",
+    "model": "gpt-image-2.5-sunburst",
     "prompt": "高端香水产品海报，黑色背景，轮廓光，商业摄影",
     "size": "3840x2160",
-    "quality": "high"
+    "quality": "xhigh"
   }'
 ```
 
-文生图、图像编辑和多参考图示例都可以把 `model` 换成其他模型。
+日常出图或批量任务可把模型换成 `gpt-image-2.5-flare`；文生图、图像编辑和多参考图的请求格式不变。
 
 ### 一次出多张 · `n`
 

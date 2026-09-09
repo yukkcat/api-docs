@@ -17,7 +17,7 @@ const copy = {
     console: 'API 控制台',
     shop: '购买额度',
     sections: [
-      ['图像接口', 'GPT Image 2 与 Nano Banana 的生成和编辑调用'],
+      ['图像接口', 'GPT Image 2 / 2.5 与 Nano Banana 的生成和编辑调用'],
       ['对话接口', 'Chat Completions、Responses 与 Claude Messages'],
     ],
   },
@@ -27,7 +27,7 @@ const copy = {
     console: 'API Console',
     shop: 'Buy Credits',
     sections: [
-      ['Image API', 'Generate and edit images with GPT Image 2 and Nano Banana'],
+      ['Image API', 'Generate and edit images with GPT Image 2 / 2.5 and Nano Banana'],
       ['Chat API', 'Chat Completions, Responses, and Claude Messages'],
     ],
   },
