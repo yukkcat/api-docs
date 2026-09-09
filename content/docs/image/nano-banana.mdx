@@ -214,25 +214,21 @@ OpenAI 的 `size` 和 `response_format` 不属于 Gemini 原生请求。Gemini �
 | `imageConfig.aspectRatio` | 图片比例，例如 `1:1`、`16:9`、`3:4`。不需要固定比例时省略。 |
 | `imageConfig.imageSize` | 分辨率档位，例如 `1K`、`2K`、`4K`；以当前模型和服务端支持范围为准。 |
 
-### 返回模式
+### 返回方式
 
-`responseModalities` 决定响应中希望得到的内容类型：
+`responseModalities` 决定模型生成哪类内容，不决定图片在 JSON 中使用 Base64 还是 URL。生成图片仍然传 `['IMAGE']`；不要为了获取 URL 改成 `['TEXT']`。
 
-| 值 | 常见结果 | 说明 |
-| --- | --- | --- |
-| `['IMAGE']` | `inlineData`（Base64） | 当前文档推荐的图片返回方式。 |
-| `['TEXT']` | `fileData.fileUri` 或文本 | 只有服务端启用 URL/文本转换时才可用，不能假设所有部署都支持。 |
-| `['IMAGE', 'TEXT']` | 图片和 URL/文本同时返回 | 同样取决于服务端是否启用混合返回。 |
-
-原生图片响应优先读取 `candidates[].content.parts[]`，不要只按数组下标读取：响应中可能先出现文字说明，再出现图片。常用字段如下：
+当前 `https://api.klong.lat` 实测会在 `candidates[].content.parts[]` 中返回图片 URL，而不是固定返回 `inlineData`。请遍历全部 `parts` 并按字段读取，不要写死数组下标：
 
 | 响应字段 | 用途 |
 | --- | --- |
-| `inlineData.mimeType` + `inlineData.data` | 拼接 `data:{mimeType};base64,{data}`，直接显示或保存。 |
-| `fileData.fileUri` | 读取服务端返回的图片 URL（如果当前部署支持 URL 返回）。 |
-| `text` | 模型返回的文字说明，不一定包含图片。 |
+| `file_data.file_uri` 或 `fileData.fileUri` | 图片直链；当前服务的主要返回形式。 |
+| `text` | 可能包含同一图片的 Markdown 链接，例如 `![Generated Image](<IMAGE_URL>)`。 |
+| `inline_data.data` 或 `inlineData.data` | 部分上游可能返回的 Base64 图片；结合对应的 MIME 类型解码。 |
 
-> 当前服务未明确开启 `TEXT` 或混合返回时，请固定使用 `['IMAGE']`，并以 `inlineData` 是否存在判断是否成功。原生请求只写 `imageConfig`；不要添加 OpenAI 的 `response_format` 或 `responseFormat` 字段。
+读取时优先取 `file_data` / `fileData` 中的 URL；没有时再从 `text` 提取链接；如果收到 `inline_data` / `inlineData`，则按 Base64 处理。不能仅凭缺少 `inlineData` 判断生成失败。
+
+> Gemini 请求仍只在 `generationConfig.imageConfig` 中填写比例和分辨率；不要添加 OpenAI 的 `response_format` 或 `responseFormat` 字段。
 
 ### 比例与分辨率速查
 
@@ -253,6 +249,8 @@ OpenAI 的 `size` 和 `response_format` 不属于 Gemini 原生请求。Gemini �
 
 `imageSize` 必须使用大写的 `1K`、`2K` 或 `4K`。`aspectRatio` 和 `imageSize` 都省略时，由上游自行决定；文生图建议显式填写两者。不要传 `aspectRatio: "auto"`，需要自动比例时直接省略字段。
 
+当前服务实测：`gemini-3.1-flash-image-preview` 使用 `aspectRatio: "1:1"` 和 `imageSize: "4K"`，实际返回图片为 `4096×4096`。
+
 部分上游还提供 `8:1`、`4:1`、`1:4`、`1:8` 这类超宽比例。它们并非所有模型或部署都开放；只有在服务端明确支持并且实际返回成功时才使用，遇到 `400` 时请改用上面的通用比例。
 
 参考实现常见的 1K 尺寸如下；如果服务端按同一比例放大，2K、4K 通常约为下表的 2 倍、4 倍，但最终像素仍以实际响应为准：
@@ -264,9 +262,9 @@ OpenAI 的 `size` 和 `response_format` 不属于 Gemini 原生请求。Gemini �
 | `1:4` | 512×2064 |
 | `1:8` | 352×2928 |
 
-### 原生响应
+### 当前服务响应
 
-图片通常位于 `candidates[0].content.parts` 的 `inlineData` 节点：
+当前服务返回的是图片 URL。结构可能同时包含 `text` 和 `file_data`：
 
 ```json
 {
@@ -275,9 +273,12 @@ OpenAI 的 `size` 和 `response_format` 不属于 Gemini 原生请求。Gemini �
       "content": {
         "parts": [
           {
-            "inlineData": {
-              "mimeType": "image/png",
-              "data": "<BASE64>"
+            "text": "![Generated Image](<IMAGE_URL>)"
+          },
+          {
+            "file_data": {
+              "mime_type": "image/jpeg",
+              "file_uri": "<IMAGE_URL>"
             }
           }
         ]
@@ -286,6 +287,8 @@ OpenAI 的 `size` 和 `response_format` 不属于 Gemini 原生请求。Gemini �
   ]
 }
 ```
+
+部分客户端会把字段显示为 camelCase，即 `fileData.fileUri`。如果其他上游返回 `inlineData`，也应作为兼容形式处理。
 
 ### 各语言原生示例
 
@@ -571,6 +574,6 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 
 ### 为什么看不到图片？
 
-Gemini 官方协议先检查 `candidates[].content.parts[].inlineData.data`，并根据 `mimeType` 拼接 `data:{mimeType};base64,{data}`。OpenAI Images API 读取 `data[0].url` 或 `data[0].b64_json`。
+Gemini 官方协议需要遍历 `candidates[].content.parts[]`：优先读取 `file_data.file_uri` / `fileData.fileUri`，其次从 `text` 中提取 Markdown 图片链接；若返回 `inline_data.data` / `inlineData.data`，再按 Base64 解码。OpenAI Images API 则读取 `data[0].url` 或 `data[0].b64_json`。
 
 长段中文仍可能出现错字、漏字或顺序错误。图片适合做构图和视觉草稿；需要准确排版的标题、条款或正文，建议生成后在设计软件中添加。

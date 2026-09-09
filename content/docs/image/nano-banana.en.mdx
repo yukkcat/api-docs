@@ -227,25 +227,21 @@ Common reference implementations use the following 1K dimensions. If the service
 
 `imageSize` must use uppercase `1K`, `2K`, or `4K`. Omit both `aspectRatio` and `imageSize` to let the upstream choose. Do not send `aspectRatio: "auto"`; omit the field when the ratio should be automatic.
 
-### Native response modes
+### Response format
 
-`responseModalities` specifies which content types the response may contain:
+`responseModalities` selects what the model generates; it does not decide whether an image is encoded as Base64 or returned as a URL in the JSON response. Continue to use `['IMAGE']` for image generation. Do not switch to `['TEXT']` merely to request a URL.
 
-| Value | Common result | Notes |
-| --- | --- | --- |
-| `['IMAGE']` | `inlineData` (Base64) | Recommended for native image responses on this page. |
-| `['TEXT']` | `fileData.fileUri` or text | Only available when URL/text conversion is enabled by the service; do not assume every deployment supports it. |
-| `['IMAGE', 'TEXT']` | Image plus URL/text | Mixed output also depends on the service configuration. |
-
-Read `candidates[].content.parts[]` by field instead of assuming a fixed array index. A response may contain text before the image. The common fields are:
+Current tests against `https://api.klong.lat` return an image URL in `candidates[].content.parts[]` instead of always returning `inlineData`. Iterate over every `part` and read it by field name rather than assuming a fixed array index:
 
 | Response field | Use |
 | --- | --- |
-| `inlineData.mimeType` + `inlineData.data` | Build `data:{mimeType};base64,{data}` to display or save the image. |
-| `fileData.fileUri` | Read a service-generated image URL, when URL output is enabled. |
-| `text` | Model-generated text; it does not necessarily contain an image. |
+| `file_data.file_uri` or `fileData.fileUri` | Direct image URL and the primary form returned by the current service. |
+| `text` | May contain a Markdown link to the same image, such as `![Generated Image](<IMAGE_URL>)`. |
+| `inline_data.data` or `inlineData.data` | A Base64 image that some upstreams may return; decode it with the corresponding MIME type. |
 
-> Unless the service explicitly enables `TEXT` or mixed output, use `['IMAGE']` and treat the presence of `inlineData` as the success signal. Native requests use `imageConfig` only; do not add OpenAI `response_format` or `responseFormat` fields.
+Prefer the URL from `file_data` / `fileData`, then extract a URL from `text`. If `inline_data` / `inlineData` is present, handle it as Base64. The absence of `inlineData` alone does not mean generation failed.
+
+> Keep ratio and resolution under `generationConfig.imageConfig`. Do not add OpenAI `response_format` or `responseFormat` fields to a Gemini request.
 
 ### Aspect ratio and resolution quick reference
 
@@ -264,9 +260,11 @@ The following are common target pixels for Gemini image models. The actual dimen
 | `4:5` | 928×1152 | 1856×2304 | 3712×4608 |
 | `21:9` | 1584×672 | 3168×1344 | 6336×2688 |
 
-### Native response
+Current service test: `gemini-3.1-flash-image-preview` with `aspectRatio: "1:1"` and `imageSize: "4K"` returned an actual `4096×4096` image.
 
-The image is normally returned in the `inlineData` node under `candidates[0].content.parts`:
+### Current service response
+
+The current service returns an image URL. A response may contain both `text` and `file_data`:
 
 ```json
 {
@@ -275,9 +273,12 @@ The image is normally returned in the `inlineData` node under `candidates[0].con
       "content": {
         "parts": [
           {
-            "inlineData": {
-              "mimeType": "image/png",
-              "data": "<BASE64>"
+            "text": "![Generated Image](<IMAGE_URL>)"
+          },
+          {
+            "file_data": {
+              "mime_type": "image/jpeg",
+              "file_uri": "<IMAGE_URL>"
             }
           }
         ]
@@ -286,6 +287,8 @@ The image is normally returned in the `inlineData` node under `candidates[0].con
   ]
 }
 ```
+
+Some clients expose the camelCase form `fileData.fileUri`. Also retain support for `inlineData` when another upstream returns a Base64 image.
 
 ### Native examples by language
 
@@ -571,6 +574,6 @@ Start with `nano-banana2` to verify the request and product flow. To use Pro, ch
 
 ### Where is the image in the response?
 
-For native Gemini, check `candidates[].content.parts[].inlineData.data` and use its `mimeType` to build a data URL. For the OpenAI Images API, read `data[0].url` or `data[0].b64_json`.
+For native Gemini, iterate over `candidates[].content.parts[]`: prefer `file_data.file_uri` / `fileData.fileUri`, then extract a Markdown image URL from `text`; if `inline_data.data` / `inlineData.data` is returned, decode the Base64 value. For the OpenAI Images API, read `data[0].url` or `data[0].b64_json`.
 
 Long text rendered inside an image can still contain missing, incorrect, or reordered characters. Use generated images for visual composition; add exact headings, clauses, or body copy in a design tool afterward.
