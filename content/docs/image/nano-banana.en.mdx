@@ -1,13 +1,13 @@
 ---
 title: Nano Banana
-description: OpenAI-compatible Nano Banana models and native Gemini protocol models
+description: Nano Banana through the OpenAI Images API and the native Gemini protocol
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
 <img src="/gemini-avatar.svg" alt="Nano Banana illustration" width="220" />
 
-This page covers two model groups with different protocols. Use the OpenAI-compatible protocol for `nano-banana2` and `nano-banana-pro`. Use the native Gemini protocol for `gemini-3.1-flash-image-preview` and `gemini-3-pro-image-preview`. Select the endpoint and request body by model; do not cross-call the two groups.
+This page covers two separate integration routes. `nano-banana2` and `nano-banana-pro` are relayed through NewAPI and use only the OpenAI Images API. `gemini-3.1-flash-image-preview` and `gemini-3-pro-image-preview` use the native Gemini protocol. These names are not interchangeable aliases; select the endpoint and request body by model.
 
 ## Basic information
 
@@ -23,87 +23,25 @@ This page covers two model groups with different protocols. Use the OpenAI-compa
 
 | Model | Protocol | Endpoint |
 | --- | --- | --- |
-| `nano-banana2` | OpenAI-compatible | `/v1/chat/completions` or `/v1/images/*` |
-| `nano-banana-pro` | OpenAI-compatible | `/v1/chat/completions` or `/v1/images/*` |
+| `nano-banana2` | OpenAI Images API (via NewAPI) | `POST /v1/images/generations` or `/v1/images/edits` |
+| `nano-banana-pro` | OpenAI Images API (via NewAPI) | `POST /v1/images/generations` or `/v1/images/edits` |
 | `gemini-3.1-flash-image-preview` | Native Gemini | `POST /v1beta/models/{model}:generateContent` |
 | `gemini-3-pro-image-preview` | Native Gemini | `POST /v1beta/models/{model}:generateContent` |
 
-The model ID determines the protocol as well as the capability. Do not place the first two models in a Gemini URL, and do not send the two `gemini-*` models to the OpenAI Images API.
+The model ID determines the protocol as well as the capability. The `nano-*` models do not expose a native Gemini format, so do not place them in a Gemini URL. Do not send the two `gemini-*` models to the OpenAI Images API either.
 
 ## Choose a request format
 
 | Need | Endpoint |
 | --- | --- |
-| Use `nano-banana2` or `nano-banana-pro` in a chat client | `POST /v1/chat/completions` |
 | Generate with `nano-banana2` or `nano-banana-pro` | `POST /v1/images/generations` |
 | Edit with `nano-banana2` or `nano-banana-pro` | `POST /v1/images/edits` |
 | Use `gemini-3.1-flash-image-preview` or `gemini-3-pro-image-preview` | `POST /v1beta/models/{model}:generateContent` |
 | Stream through the native Gemini protocol | Change the method to `:streamGenerateContent`; keep the request body the same |
 
-## OpenAI-compatible format
+## OpenAI Images API
 
-This section applies only to `nano-banana2` and `nano-banana-pro`.
-
-### Chat Completions
-
-Use this endpoint with an existing OpenAI chat integration, new-api, one-api, or a client that only accepts chat models.
-
-```http
-POST https://api.klong.lat/v1/chat/completions
-Authorization: Bearer <API_KEY>
-Content-Type: application/json
-```
-
-```json
-{
-  "model": "nano-banana-pro",
-  "messages": [
-    {
-      "role": "user",
-      "content": "An orange cat wearing a wizard hat, illustration style"
-    }
-  ],
-  "aspect_ratio": "16:9",
-  "image_size": "2K"
-}
-```
-
-`aspect_ratio` and `image_size` are optional top-level fields. The camelCase forms `aspectRatio` and `imageSize` are accepted as well. In a non-streaming response, the image URL is usually returned as Markdown in `choices[0].message.content`:
-
-```json
-{
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "![Generated Image](<IMAGE_URL>)"
-      },
-      "finish_reason": "stop"
-    }
-  ]
-}
-```
-
-For image-to-image generation, use an array for `content`. Each `image_url.url` may contain a public image URL or a Data URL, and multiple reference images may be supplied in order:
-
-```json
-{
-  "model": "nano-banana-pro",
-  "messages": [{
-    "role": "user",
-    "content": [
-      { "type": "text", "text": "Combine the subject from image 1 with the background from image 2" },
-      { "type": "image_url", "image_url": { "url": "https://your-domain.example/subject.png" } },
-      { "type": "image_url", "image_url": { "url": "data:image/png;base64,<BASE64>" } }
-    ]
-  }],
-  "image_size": "2K"
-}
-```
-
-Add `"stream": true` for an SSE response. To include usage in the final event, also add `"stream_options": { "include_usage": true }`.
-
-For clients that only accept a model name and expose no resolution field, append the tier to the model name, for example `nano-banana-pro 4k` or `nano-banana2 2k`.
+This section applies only to `nano-banana2` and `nano-banana-pro` as relayed through NewAPI. The current integration exposes only the OpenAI Images API; it does not provide a native Gemini format and does not use `/v1/chat/completions`.
 
 ### Images API text to image
 
@@ -625,14 +563,14 @@ Image generation takes longer than text requests, and 4K output takes longer sti
 
 ### Can I mix OpenAI and Gemini fields?
 
-No. The OpenAI-compatible endpoint uses `model`, `prompt`, `size`, and `response_format`, and accepts only `nano-banana2` or `nano-banana-pro` from this page. The native Gemini endpoint uses `contents`, `generationConfig.responseModalities`, and `generationConfig.imageConfig`, and accepts only the two `gemini-*` models. Both the model ID and request fields must match the endpoint.
+No. The OpenAI Images API uses `model`, `prompt`, `size`, and `response_format`, and accepts only `nano-banana2` or `nano-banana-pro` from this page. The native Gemini endpoint uses `contents`, `generationConfig.responseModalities`, and `generationConfig.imageConfig`, and accepts only the two `gemini-*` models. Both the model ID and request fields must match the endpoint.
 
 ### Which model should I choose?
 
-Start with `nano-banana2` to verify the request and product flow. To use Pro, change the model ID to `nano-banana-pro`; keep the other OpenAI-compatible fields unchanged. Actual speed, quota, and available sizes depend on the current service configuration.
+Start with `nano-banana2` to verify the request and product flow. To use Pro, change the model ID to `nano-banana-pro`; keep the other Images API fields unchanged. Actual speed, quota, and available sizes depend on the current service configuration.
 
 ### Where is the image in the response?
 
-For native Gemini, check `candidates[].content.parts[].inlineData.data` and use its `mimeType` to build a data URL. For the OpenAI Images API, read `data[0].url` or `data[0].b64_json`. For Chat Completions, read the Markdown image link in `choices[0].message.content`.
+For native Gemini, check `candidates[].content.parts[].inlineData.data` and use its `mimeType` to build a data URL. For the OpenAI Images API, read `data[0].url` or `data[0].b64_json`.
 
 Long text rendered inside an image can still contain missing, incorrect, or reordered characters. Use generated images for visual composition; add exact headings, clauses, or body copy in a design tool afterward.

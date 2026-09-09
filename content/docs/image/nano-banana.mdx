@@ -1,13 +1,13 @@
 ---
 title: Nano Banana
-description: Nano Banana 的 OpenAI 兼容模型与 Gemini 官方协议模型调用指南
+description: Nano Banana 的 OpenAI Images API 与 Gemini 官方协议调用指南
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
 <img src="/gemini-avatar.svg" alt="Nano Banana 插画" width="220" />
 
-本页包含两组模型，但它们的调用协议不同：`nano-banana2` 和 `nano-banana-pro` 走 OpenAI 兼容协议；`gemini-3.1-flash-image-preview` 和 `gemini-3-pro-image-preview` 走 Gemini 官方原生协议。请根据模型选择对应的接口和请求体，不要交叉调用。
+本页包含两组独立入口：`nano-banana2` 和 `nano-banana-pro` 经 NewAPI 中转，只走 OpenAI Images API；`gemini-3.1-flash-image-preview` 和 `gemini-3-pro-image-preview` 走 Gemini 官方原生协议。它们不是可以随意替换的别名，请根据模型选择对应的接口和请求体。
 
 ## 基础信息
 
@@ -23,87 +23,25 @@ import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
 | 模型 | 调用协议 | 请求入口 |
 | --- | --- | --- |
-| `nano-banana2` | OpenAI 兼容协议 | `/v1/chat/completions` 或 `/v1/images/*` |
-| `nano-banana-pro` | OpenAI 兼容协议 | `/v1/chat/completions` 或 `/v1/images/*` |
+| `nano-banana2` | OpenAI Images API（NewAPI 中转） | `POST /v1/images/generations` 或 `/v1/images/edits` |
+| `nano-banana-pro` | OpenAI Images API（NewAPI 中转） | `POST /v1/images/generations` 或 `/v1/images/edits` |
 | `gemini-3.1-flash-image-preview` | Gemini 官方协议 | `POST /v1beta/models/{model}:generateContent` |
 | `gemini-3-pro-image-preview` | Gemini 官方协议 | `POST /v1beta/models/{model}:generateContent` |
 
-模型名不仅代表能力，也决定调用协议。前两个模型不要放进 Gemini 的 URL，后两个模型不要传给 OpenAI Images API。
+模型名不仅代表能力，也决定调用协议。`nano-*` 模型没有 Gemini 原生格式，不要放进 Gemini 的 URL；`gemini-*` 模型也不要传给 OpenAI Images API。
 
 ## 选择请求格式
 
 | 需求 | 使用方式 |
 | --- | --- |
-| 在聊天客户端中使用 `nano-banana2` 或 `nano-banana-pro` | `POST /v1/chat/completions` |
 | 使用 `nano-banana2` 或 `nano-banana-pro` 文生图 | `POST /v1/images/generations` |
 | 使用 `nano-banana2` 或 `nano-banana-pro` 编辑图片 | `POST /v1/images/edits` |
 | 使用 `gemini-3.1-flash-image-preview` 或 `gemini-3-pro-image-preview` | `POST /v1beta/models/{model}:generateContent` |
 | Gemini 官方协议需要流式响应 | 将方法名改为 `:streamGenerateContent`，请求体保持一致 |
 
-## OpenAI 兼容格式
+## OpenAI Images API
 
-本节只适用于 `nano-banana2` 和 `nano-banana-pro`。
-
-### Chat Completions
-
-适合已经接入 OpenAI 对话接口、new-api、one-api 或只能使用聊天模型的客户端。
-
-```http
-POST https://api.klong.lat/v1/chat/completions
-Authorization: Bearer <API_KEY>
-Content-Type: application/json
-```
-
-```json
-{
-  "model": "nano-banana-pro",
-  "messages": [
-    {
-      "role": "user",
-      "content": "一只戴着巫师帽的橘猫，插画风格"
-    }
-  ],
-  "aspect_ratio": "16:9",
-  "image_size": "2K"
-}
-```
-
-`aspect_ratio` 与 `image_size` 是顶层可选参数，也接受 `aspectRatio` 与 `imageSize`。非流式响应中的图片 URL 位于 `choices[0].message.content`，通常以 Markdown 图片形式返回：
-
-```json
-{
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "![Generated Image](<IMAGE_URL>)"
-      },
-      "finish_reason": "stop"
-    }
-  ]
-}
-```
-
-图生图时，把 `content` 改成数组；`image_url.url` 可以使用公网图片 URL 或 Data URL，也可以依次放入多张参考图：
-
-```json
-{
-  "model": "nano-banana-pro",
-  "messages": [{
-    "role": "user",
-    "content": [
-      { "type": "text", "text": "把图 1 的主体与图 2 的背景合成一张图" },
-      { "type": "image_url", "image_url": { "url": "https://your-domain.example/subject.png" } },
-      { "type": "image_url", "image_url": { "url": "data:image/png;base64,<BASE64>" } }
-    ]
-  }],
-  "image_size": "2K"
-}
-```
-
-需要流式返回时加入 `"stream": true`；还需要最后一段返回用量时，再加入 `"stream_options": { "include_usage": true }`。
-
-部分只能填写模型名、无法单独填写分辨率的客户端，可以把档位写进模型名，例如 `nano-banana-pro 4k` 或 `nano-banana2 2k`。
+本节只适用于经 NewAPI 中转的 `nano-banana2` 和 `nano-banana-pro`。当前入口仅支持 OpenAI Images API，不提供 Gemini 原生格式，也不使用 `/v1/chat/completions`。
 
 ### Images API 文生图
 
@@ -625,14 +563,14 @@ Console.WriteLine(await response.Content.ReadAsStringAsync());
 
 ### OpenAI 和 Gemini 请求能混用吗？
 
-不能。OpenAI 兼容入口使用 `model`、`prompt`、`size` 和 `response_format`，并且只调用 `nano-banana2` 或 `nano-banana-pro`；Gemini 原生入口使用 `contents`、`generationConfig.responseModalities` 和 `generationConfig.imageConfig`，并且只调用两个 `gemini-*` 模型。模型名和请求字段都要与入口对应。
+不能。OpenAI Images API 使用 `model`、`prompt`、`size` 和 `response_format`，并且只调用 `nano-banana2` 或 `nano-banana-pro`；Gemini 原生入口使用 `contents`、`generationConfig.responseModalities` 和 `generationConfig.imageConfig`，并且只调用两个 `gemini-*` 模型。模型名和请求字段都要与入口对应。
 
 ### `nano-banana2` 和 `nano-banana-pro` 怎么选？
 
-先使用 `nano-banana2` 验证请求格式和业务流程；需要使用 Pro 模型时把模型名替换为 `nano-banana-pro`，其他 OpenAI 兼容字段保持不变。具体速度、额度和可用尺寸以服务端当前配置为准。
+先使用 `nano-banana2` 验证请求格式和业务流程；需要使用 Pro 模型时把模型名替换为 `nano-banana-pro`，其他 Images API 字段保持不变。具体速度、额度和可用尺寸以服务端当前配置为准。
 
 ### 为什么看不到图片？
 
-Gemini 官方协议先检查 `candidates[].content.parts[].inlineData.data`，并根据 `mimeType` 拼接 `data:{mimeType};base64,{data}`。OpenAI Images API 读取 `data[0].url` 或 `data[0].b64_json`；Chat Completions 则读取 `choices[0].message.content` 中的 Markdown 图片链接。
+Gemini 官方协议先检查 `candidates[].content.parts[].inlineData.data`，并根据 `mimeType` 拼接 `data:{mimeType};base64,{data}`。OpenAI Images API 读取 `data[0].url` 或 `data[0].b64_json`。
 
 长段中文仍可能出现错字、漏字或顺序错误。图片适合做构图和视觉草稿；需要准确排版的标题、条款或正文，建议生成后在设计软件中添加。
