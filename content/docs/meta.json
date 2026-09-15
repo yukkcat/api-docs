@@ -1,5 +1,5 @@
 {
   "title": "Klong API",
   "root": true,
-  "pages": ["image", "chat"]
+  "pages": ["models", "image", "chat"]
 }

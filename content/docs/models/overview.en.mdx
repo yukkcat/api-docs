@@ -1,0 +1,47 @@
+---
+title: Models
+description: Klong API model groups, protocols, and channel capabilities
+---
+
+Capabilities, channels, and prices may change. See the [API pricing page](https://api.klong.lat/pricing) for current prices. For endpoints, parameters, and examples, see [GPT Image API](/en/docs/image/gpt-image-2), [Nano Banana](/en/docs/image/nano-banana), and [Chat API](/en/docs/chat/chat-completions).
+
+> **Check the group before the model name.** The same name can have different capabilities in different channels. Use the channel actually assigned in the API Console.
+
+## GPT-Image group
+
+| Subgroup | Models | Description |
+| --- | --- | --- |
+| Standard | `gpt-image-2`, `gpt-image-2.5`, `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst` | All four names are the same model; high-quality Lanczos upscaling supports 1K / 2K / 4K |
+| Exact size | `gpt-image-2-exact`, `gpt-image-2.5-exact` | Both names are the same model; `size` is enforced after processing, up to 1K / 2K / 4K |
+| Direct 1K | `gpt-image-2-1k`, `gpt-image-2.5-1k` | Direct 1K output from the upstream website; no upscaling, resizing, or other post-processing |
+
+All models in the GPT-Image group (Standard, Exact-size, and Direct 1K) cost ¥0.02 per image. After a ¥100 prepaid or cumulative spend, contact the service provider to request ¥0.01 per image. The channel supports high concurrency, up to about 20,000 requests; stability depends on the upstream website.
+
+For the Standard subgroup, `size` is a target and the final pixels are not guaranteed to match it exactly. A `1024x1024` request may return `1250x1250` or `1249x1251`. The `-exact` variants apply high-quality Lanczos resizing and center cropping, then enforce the requested dimensions; a large ratio mismatch can crop the image, and unusual ratios may look stretched.
+
+## Image-generation group
+
+| Model | Protocol | Description |
+| --- | --- | --- |
+| `gpt-image-2-vip` | OpenAI Images API | `quality` is fixed to `medium`; native output up to 4K |
+| `gpt-image-2-high` | OpenAI Images API | `quality` supports `medium` / `high`; native output up to 4K |
+| `nano-banana2` | OpenAI Images API (NewAPI relay) | Uses the OpenAI Images API, not the native Gemini request format |
+| `nano-banana-pro` | OpenAI Images API (NewAPI relay) | Uses the OpenAI Images API, not the native Gemini request format |
+
+## image2.5 official channel
+
+| Model | Description |
+| --- | --- |
+| `gpt-image-2.5-flare` | Official channel with the full parameter set |
+| `gpt-image-2.5-sunburst` | Official channel with the full parameter set |
+
+Both official models support native 1K / 2K / 4K. `quality` supports five levels: `low`, `medium`, `high`, `xhigh`, and `max`. In the GPT-Image Standard group, these names still follow the Standard model behavior.
+
+## Banana group
+
+| Model | Protocol | Endpoint |
+| --- | --- | --- |
+| `gemini-3.1-flash-image-preview` | Native Gemini protocol | `POST /v1beta/models/{model}:generateContent` |
+| `gemini-3-pro-image-preview` | Native Gemini protocol | `POST /v1beta/models/{model}:generateContent` |
+
+The Banana group uses the native Gemini request body. Do not send these two models to the OpenAI Images API. See the [Nano Banana documentation](/en/docs/image/nano-banana) for the full request format.

@@ -6,6 +6,7 @@ import { localizePath, type Locale } from '@/lib/i18n';
 import { SidebarTabsDropdown } from 'fumadocs-ui/components/sidebar/tabs/dropdown';
 import type { LayoutTab } from 'fumadocs-ui/layouts/shared';
 import {
+  Cpu,
   ImageIcon,
   MessageSquareText,
   type LucideIcon,
@@ -21,6 +22,14 @@ type DocsSection = {
 };
 
 const tabs: DocsSection[] = [
+  {
+    title: { 'zh-CN': '模型介绍', en: 'Models' },
+    description: { 'zh-CN': '模型分组、协议与渠道能力', en: 'Model groups, protocols, and channels' },
+    href: '/docs/models/overview',
+    prefix: '/docs/models',
+    paths: ['/docs/models/overview'],
+    icon: Cpu,
+  },
   {
     title: { 'zh-CN': '图像接口', en: 'Image API' },
     description: { 'zh-CN': 'GPT Image 与 Nano Banana', en: 'GPT Image and Nano Banana' },

@@ -1,0 +1,47 @@
+---
+title: 模型介绍
+description: Klong API 模型分组、调用协议与渠道能力
+---
+
+模型能力、渠道和价格可能调整，当前价格请查看 [API 定价页](https://api.klong.lat/pricing)。接口地址、参数和请求示例请分别查看 [GPT Image API](/docs/image/gpt-image-2)、[Nano Banana](/docs/image/nano-banana) 和 [对话接口](/docs/chat/chat-completions)。
+
+> **先看分组，再看模型名。** 同一个名称在不同渠道可能对应不同能力，请以 API 控制台实际分配的渠道为准。
+
+## GPT-Image 分组
+
+| 子组 | 模型 | 说明 |
+| --- | --- | --- |
+| 普通 | `gpt-image-2`、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` | 四个名称是同一个模型；图片经高质量 Lanczos 插值超分，支持 1K / 2K / 4K |
+| 精确尺寸 | `gpt-image-2-exact`、`gpt-image-2.5-exact` | 两个名称是同一个模型；按 `size` 校正最终像素，支持 1K / 2K / 4K |
+| 1K 直出 | `gpt-image-2-1k`、`gpt-image-2.5-1k` | 官网 1K 直出，不做超分、缩放或其他后处理 |
+
+GPT-Image 分组（普通、精确尺寸和 1K 直出）价格均为 ¥0.02/张；预充或累计消费达到 ¥100 后，可联系申请调整为 ¥0.01/张。支持高并发，最高约 20,000 并发；实际稳定性取决于官网上游状态。
+
+普通子组的 `size` 是目标尺寸，不保证最终像素完全一致。例如请求 `1024x1024`，可能返回 `1250x1250` 或 `1249x1251`。`-exact` 会进行高质量 Lanczos 缩放与居中裁切，严格输出请求尺寸；比例差异较大时可能裁切，特殊比例可能出现视觉拉伸。
+
+## 画图分组
+
+| 模型 | 协议 | 说明 |
+| --- | --- | --- |
+| `gpt-image-2-vip` | OpenAI Images API | `quality` 固定为 `medium`，支持原生最高 4K |
+| `gpt-image-2-high` | OpenAI Images API | `quality` 支持 `medium` / `high`，支持原生最高 4K |
+| `nano-banana2` | OpenAI Images API（NewAPI 中转） | 使用 OpenAI Images API，不使用 Gemini 原生请求格式 |
+| `nano-banana-pro` | OpenAI Images API（NewAPI 中转） | 使用 OpenAI Images API，不使用 Gemini 原生请求格式 |
+
+## image2.5 官方渠道
+
+| 模型 | 说明 |
+| --- | --- |
+| `gpt-image-2.5-flare` | 官方渠道，支持完整参数 |
+| `gpt-image-2.5-sunburst` | 官方渠道，支持完整参数 |
+
+两个官方模型支持原生 1K / 2K / 4K，`quality` 支持 `low`、`medium`、`high`、`xhigh`、`max` 五档。注意：这两个名称在 GPT-Image 普通分组中仍按普通模型处理。
+
+## 香蕉分组
+
+| 模型 | 协议 | 请求入口 |
+| --- | --- | --- |
+| `gemini-3.1-flash-image-preview` | Gemini 官方原生协议 | `POST /v1beta/models/{model}:generateContent` |
+| `gemini-3-pro-image-preview` | Gemini 官方原生协议 | `POST /v1beta/models/{model}:generateContent` |
+
+香蕉分组使用 Gemini 原生请求体；不要把这两个模型放到 OpenAI Images API 的请求中。完整请求格式见 [Nano Banana 文档](/docs/image/nano-banana)。
