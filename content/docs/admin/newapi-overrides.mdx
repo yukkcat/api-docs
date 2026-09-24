@@ -1,0 +1,174 @@
+---
+title: 渠道参数覆盖
+description: NewAPI 渠道参数覆盖、URL/Base64 选择与请求体透传注意事项
+---
+
+本页面向 NewAPI 管理员。普通调用者按 [GPT Image](/docs/image/gpt-image-2)、[Nano 系列](/docs/image/nano-banana)、[Grok](/docs/image/grok) 或 [Gemini 协议](/docs/image/gemini) 发送请求即可。
+
+**调用参数**表达本次请求的选择，**NewAPI 参数覆盖**修改发往下游的请求体。修改请求体不等于直接改写返回体，最终响应还取决于目标接口支持的参数和当前分组的返回方式。
+
+## 选择图片返回方式
+
+按调用协议选择覆盖字段：
+
+- OpenAI Images：`response_format: "url"` 或 `"b64_json"`。
+- Gemini：`generationConfig.responseModalities: ["TEXT"]` 选择 URL；包含 `"IMAGE"` 选择 Base64。
+- Responses：本平台支持顶层 `response_format` 选择图片交付。
+- Chat：不要把 Images 的字符串 `response_format` 照搬到 NewAPI Chat；当前链路会在解析请求时拒绝。使用分组默认/强制策略，或改用 Images 接口。
+
+如果当前分组只是默认返回 URL，请求参数仍可选择 Base64；如果分组限制为强制 URL，参数覆盖不能改变该限制。返回方式与图片文件编码相互独立，完整优先级见[尺寸与返回格式](/docs/image/openai-parameters)。
+
+## NewAPI 覆盖：请求 Base64
+
+下列 JSON 填入目标渠道的参数覆盖编辑器，要求 NewAPI 版本支持 `operations`，并且请求走会执行参数覆盖的处理路径。示例用于 **OpenAI Images**，不是 Chat。
+
+客户端原始请求：
+
+```json
+{
+  "model": "nano-banana2",
+  "prompt": "一只坐在窗边的猫",
+  "response_format": "url"
+}
+```
+
+渠道参数覆盖：
+
+```json
+{
+  "operations": [
+    { "path": "response_format", "mode": "set", "value": "b64_json" },
+    { "path": "output_format", "mode": "set", "value": "webp" }
+  ]
+}
+```
+
+相关的发出字段变为：
+
+```json
+{
+  "model": "nano-banana2",
+  "prompt": "一只坐在窗边的猫",
+  "response_format": "b64_json",
+  "output_format": "webp"
+}
+```
+
+本平台支持这些参数；没有“强制 URL”限制时，结果为 `data[].b64_json`，图片编码为 WebP。`response_format` 控制交付，`output_format` 控制文件编码；只需要 Base64 时删除第二条操作即可。
+
+参数覆盖只是发出请求的修改。如果最终分组为“强制 URL”，它仍返回 URL；如果目标是其他服务，则以那个服务的实际支持为准。
+
+## 只补充默认值
+
+让调用者优先决定参数，字段不存在时才补默认值：
+
+```json
+{
+  "operations": [
+    { "path": "image_size", "mode": "set", "value": "2K", "keep_origin": true },
+    { "path": "response_format", "mode": "set", "value": "url", "keep_origin": true }
+  ]
+}
+```
+
+对于这里的 `set` 操作，`keep_origin: true` 在目标路径存在时跳过设置；省略或设为 `false` 才会覆盖。空字符串也是存在的字段，不会自动被当作未传。判断依据是进入覆盖步骤时的请求体，未必与最初客户端的原始 body 完全相同。
+
+在本平台的尺寸规则中，显式像素 `size` 优先于 `image_size`。客户端传 `size: "1024x1024"` 时，补 `image_size: "2K"` 不会把它改成 2K。比例和档位的完整规则见[图片参数说明](/docs/image/openai-parameters)。
+
+## Gemini 的参数覆盖
+
+Gemini 不使用顶层 `response_format` 控制图片交付。调用本平台 Gemini 接口时，请覆盖 `generationConfig.responseModalities`。
+
+### 要求 URL
+
+```json
+{
+  "operations": [
+    {
+      "path": "generationConfig.responseModalities",
+      "mode": "set",
+      "value": ["TEXT"]
+    }
+  ]
+}
+```
+
+### 要求 Base64，并补缺省 2K
+
+```json
+{
+  "operations": [
+    {
+      "path": "generationConfig.responseModalities",
+      "mode": "set",
+      "value": ["IMAGE"]
+    },
+    {
+      "path": "generationConfig.imageConfig.imageSize",
+      "mode": "set",
+      "value": "2K",
+      "keep_origin": true
+    }
+  ]
+}
+```
+
+例如原请求只有 `contents`，处理后相关字段为：
+
+```json
+{
+  "contents": [{"parts": [{"text": "一只坐在窗边的猫"}]}],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": {"imageSize": "2K"}
+  }
+}
+```
+
+这是**平台兼容约定**，不是所有 Google Gemini 上游的统一交付开关：
+
+- `["TEXT"]` → 纯 URL 文本 + `file_data.file_uri`，两处是同一图片。
+- `["IMAGE"]` 或 `["TEXT", "IMAGE"]` → 仅 `inline_data.data` Base64。
+- 未传或空数组 → 分组默认；分组强制策略始终优先。
+- 顶层 `response_format` / `responseFormat` 在该 Gemini 路由被忽略；不存在 `both` 模式。
+
+若只想为缺省请求补一个选择，可为 modalities 的 `set` 操作加 `keep_origin: true`；已有空数组也会保留，最终采用当前分组的返回方式。
+
+## NewAPI 请求体透传与参数覆盖
+
+NewAPI 的请求体透传用于将原始请求体交给下游，避免协议转换遗漏扩展字段。它不代表绕过所有入口校验，也不负责将图片 URL 转换成 Base64。
+
+**不要默认“开透传 + 参数覆盖”一定同时生效。** 已核对的 NewAPI 实现中，Images 和 Gemini 的请求体透传分支直接使用原始 body；`operations` 在非透传分支执行。具体部署可能不同，必须核对日志中的实际发出请求，而不是只看编辑器保存成功。
+
+按目标选择配置：
+
+- 需要 NewAPI 为请求补字段或强制改值：确认该请求路径实际执行覆盖规则，并检查最终发出 body。
+- 需要 NewAPI 保留客户端扩展字段：使用其请求体透传时，由调用者明确传字段；不要假设覆盖规则还会执行。
+
+NewAPI Chat 的字符串 `response_format` 类型冲突可能发生在进入转发之前，不能承诺打开透传就解决。当前可靠做法见 [Chat / Responses 生图](/docs/image/openai-chat-responses)。
+
+## Responses 的工具参数
+
+如果 `tools` 第一项确定为 `image_generation`，可以覆盖该工具的参数：
+
+```json
+{
+  "operations": [
+    { "path": "tools.0.output_format", "mode": "set", "value": "webp" }
+  ]
+}
+```
+
+工具顺序不固定时不要照搬索引 `0`。平台生图处理优先读取工具内的尺寸、质量、编码参数，只改顶层同名字段可能不生效；NewAPI 是否执行该覆盖仍取决于请求处理路径。
+
+## 覆盖后没有生效
+
+按顺序核对：
+
+1. 请求实际命中的分组、渠道、模型和协议是否正确。
+2. 比较“客户端请求”和“发给上游的请求”，确认覆盖发生、扩展字段保留；multipart 要检查表单 part，不能只看 JSON。
+3. 核对当前分组是否限制了返回方式，以及目标接口是否支持覆盖的参数。
+4. 核对上游原始响应和最终响应，区分上游错误、平台处理错误、客户端解析错误。
+5. 图片已生成但下载失败时先重试原 URL；图片没展示时检查协议字段，不要立即重复生图。
+
+参数覆盖本身不会把图片 URL 下载后编码成 Base64，也不能让不支持该参数的上游自动支持。诊断日志可以保存脱敏请求体、响应摘要和调用 ID，不要保存完整密钥或无必要的整段图片 Base64。

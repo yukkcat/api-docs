@@ -1,0 +1,266 @@
+---
+title: Gemini 协议
+description: Gemini 文生图、图生图、URL 与 Base64 参数及 SSE 返回结构
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+Gemini 图片接口使用 `contents` 和 `generationConfig`，返回 `candidates[].content.parts[]`。本页适用于平台提供的 `gemini-3.1-flash-image-preview`、`gemini-3-pro-image-preview`；模型名按分组提供的完整名称填写。
+
+调用密钥须属于 Gemini 协议分组。Nano 模型使用 [OpenAI Images 协议](/docs/image/nano-banana)，不必改为 Gemini 请求。模型名称本身不表示可跨分组调用，也不表示不同渠道具备相同能力。
+
+本页描述 Klong 的 Gemini 兼容接口。下文用 `responseModalities` 选择 URL/Base64，是本平台的兼容约定，不应套用到所有 Google Gemini 服务。
+
+## 接口与认证
+
+| 用途 | POST 地址 |
+| --- | --- |
+| 普通生成或编辑 | `https://api.klong.lat/v1beta/models/{model}:generateContent` |
+| SSE 流式生成或编辑 | `https://api.klong.lat/v1beta/models/{model}:streamGenerateContent?alt=sse` |
+
+将 `{model}` 换为完整模型名。使用 JSON 请求体，认证示例为 `Authorization: Bearer <API_KEY>`；平台也支持 `x-goog-api-key: <API_KEY>`。推荐放在请求头中，不要把密钥放进可记录、分享的 URL。
+
+## 文生图：返回 URL
+
+`responseModalities: ["TEXT"]` 在本平台表示生成图片并交付 URL，不是只生成一段普通文字。以下示例适用于“默认 URL”或“默认 Base64”分组；管理员的强制策略会优先于请求参数。
+
+```bash
+curl "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview:generateContent" \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "role": "user",
+      "parts": [{"text": "木桌上的红苹果，柔和棚拍光线，极简背景"}]
+    }],
+    "generationConfig": {
+      "responseModalities": ["TEXT"],
+      "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"}
+    },
+    "output_format": "png"
+  }'
+```
+
+返回示例（ID 和地址为占位值，省略用量字段）：
+
+```json
+{
+  "candidates": [{
+    "index": 0,
+    "content": {
+      "role": "model",
+      "parts": [
+        {"text": "https://example.com/images/result.png"},
+        {"file_data": {
+          "mime_type": "image/png",
+          "file_uri": "https://example.com/images/result.png"
+        }}
+      ]
+    },
+    "finishReason": "STOP"
+  }],
+  "modelVersion": "gemini-3.1-flash-image-preview",
+  "responseId": "<RESPONSE_ID>"
+}
+```
+
+`text` 是纯 URL，不是 Markdown 图片语法。它和 `file_data.file_uri` 指向**同一张图片**；没有 `inline_data`，不会附带整张图片的 Base64。
+
+客户端优先读取 `file_data.file_uri`，不要再把相同的 `text` 当作第二张图展示。只有没有结构化图片字段时才考虑从文本中读取 URL，并按 URL 去重。需要长期保留的图片请及时保存；下载失败时先重试原 URL，不要直接重新生图。
+
+## 文生图：返回 Base64
+
+请求结构不变，只将 `responseModalities` 改为 `["IMAGE"]`：
+
+```json
+{
+  "contents": [{
+    "role": "user",
+    "parts": [{"text": "木桌上的红苹果，柔和棚拍光线，极简背景"}]
+  }],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"}
+  },
+  "output_format": "png"
+}
+```
+
+返回示例：
+
+```json
+{
+  "candidates": [{
+    "index": 0,
+    "content": {
+      "role": "model",
+      "parts": [
+        {"inline_data": {
+          "mime_type": "image/png",
+          "data": "<PNG_BASE64>"
+        }}
+      ]
+    },
+    "finishReason": "STOP"
+  }],
+  "modelVersion": "gemini-3.1-flash-image-preview",
+  "responseId": "<RESPONSE_ID>"
+}
+```
+
+`inline_data.data` 是图片字节的 Base64，不含 `data:image/png;base64,` 前缀。不同时返回图片 URL。图片数据字段使用 snake_case；`finishReason`、`modelVersion`、`responseId` 保持示例中的命名。
+
+### 选择规则
+
+| `generationConfig.responseModalities` | 默认策略分组的交付结果 |
+| --- | --- |
+| `["TEXT"]` | 纯文本 URL + `file_data`，两处引用同一张图 |
+| `["IMAGE"]` | 仅 `inline_data` Base64 |
+| `["TEXT", "IMAGE"]` | 仅 `inline_data` Base64，不是两种交付同时返回 |
+| 不传或空数组 | 使用分组默认交付方式 |
+
+优先级是：**分组强制策略 > 本次请求的 modalities > 分组默认策略**。例如“强制 URL”分组即使收到 `["IMAGE"]`，仍返回 URL。2026 年 9 月 24 日的线上抽样中，省略 modalities 返回 URL；这只是当时分组的默认值，不表示每个部署都相同。
+
+Gemini 路由忽略顶层 `response_format` 和 `responseFormat`，不要用它们控制返回。当前没有 `both` 交付模式。管理员配置见[渠道参数覆盖](/docs/admin/newapi-overrides)。
+
+## 比例、分辨率与编码
+
+| 字段 | 用途 |
+| --- | --- |
+| `generationConfig.imageConfig.aspectRatio` | 比例，如 `1:1`、`16:9`、`9:16`、`4:3`、`3:4` |
+| `generationConfig.imageConfig.imageSize` | 分辨率档位，如 `1K`、`2K`、`4K`；由模型和渠道决定支持范围 |
+| 顶层 `output_format` | 实际文件编码：`png`、`jpeg`、`webp`；`jpg` 等同于 `jpeg` |
+
+比例和档位可以只传其中一项；都省略时交由上游选择。不要用 `aspectRatio: "auto"` 表示自动比例，应省略该字段。档位不等同于精确像素：本轮 Flash 的 `16:9 + 2K` 实测为 `2752×1536`，不是固定 `2048×1152`。4K 未在本轮实测，不承诺所有渠道都支持。
+
+本平台也接受顶层 `size`、`aspect_ratio`、`image_size`。同一项顶层参数优先于 `imageConfig`；明确像素 `size` 优先于比例与档位。面向 Gemini 原生上游时，像素目标会转换为适用的比例和档位，最终是否精确缩放取决于渠道配置。完整规则见[图片参数说明](/docs/image/openai-parameters)。
+
+`output_format` 是平台扩展，与 URL/Base64 独立。省略时保留处理后的编码；返回的 `mime_type` 应用于识别实际编码，不要仅凭扩展名判断。前置中转须保留该字段。不要把这里的平台扩展当作所有 Gemini 上游都直接支持的参数。
+
+## Python：读取一张图片
+
+下面显式请求 PNG Base64；若分组强制 URL，代码也能读取 URL。解析时只把结构化图片字段作为结果，避免把 URL 文本重复显示为第二张图。
+
+```python
+import base64
+from pathlib import Path
+import requests
+
+response = requests.post(
+    "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview:generateContent",
+    headers={"Authorization": "Bearer <API_KEY>"},
+    json={
+        "contents": [{"parts": [{"text": "木桌上的红苹果"}]}],
+        "generationConfig": {"responseModalities": ["IMAGE"]},
+        "output_format": "png",
+    },
+    timeout=300,
+)
+response.raise_for_status()
+payload = response.json()
+extensions = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
+seen_urls = set()
+image_count = 0
+
+for candidate in payload.get("candidates", []):
+    for part in candidate.get("content", {}).get("parts", []):
+        inline = part.get("inline_data") or part.get("inlineData")
+        file = part.get("file_data") or part.get("fileData")
+        if inline:
+            mime = inline.get("mime_type") or inline.get("mimeType")
+            image_count += 1
+            path = Path(f"image-{image_count}.{extensions.get(mime, 'bin')}")
+            path.write_bytes(base64.b64decode(inline["data"], validate=True))
+            print(path)
+        elif file:
+            url = file.get("file_uri") or file.get("fileUri")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                image_count += 1
+                print(url)
+
+if image_count == 0:
+    raise RuntimeError("响应没有结构化图片字段，请检查文本、finishReason 和错误日志")
+```
+
+解析器额外兼容 camelCase 图片字段，便于对接其他上游；本平台标准响应示例采用 snake_case。代码中的 300 秒是客户端示例超时，不是服务端保证完成时间。
+
+## 参考图与图片编辑
+
+编辑仍调用 `generateContent`，把文字和参考图放在同一个 `parts` 数组中。参考图的表示与结果的交付方式相互独立：输入 Base64 也可以返回 URL。
+
+<Tabs items={['Base64 参考图', 'URL 参考图']}>
+<Tab>
+
+```json
+{
+  "contents": [{
+    "role": "user",
+    "parts": [
+      {"text": "将图片中的蓝色圆形改成红色，保留其他元素"},
+      {"inlineData": {"mimeType": "image/png", "data": "<PNG_BASE64>"}}
+    ]
+  }],
+  "generationConfig": {"responseModalities": ["TEXT"]},
+  "output_format": "png"
+}
+```
+
+`data` 填写裸 Base64，`mimeType` 填写真实图片类型。该输入方式已在 Flash 和 Pro 模型上实测；示例选择返回 URL。
+
+</Tab>
+<Tab>
+
+```json
+{
+  "contents": [{
+    "role": "user",
+    "parts": [
+      {"text": "将图片中的蓝色圆形改成红色，保留其他元素"},
+      {"fileData": {"mimeType": "image/png", "fileUri": "https://example.com/input.png"}}
+    ]
+  }],
+  "generationConfig": {"responseModalities": ["IMAGE"]}
+}
+```
+
+将示例 URL 换成服务端可访问的图片地址。此输入形式由平台解析器支持；本轮编辑实测主要使用 Base64 参考图，不等同于所有外部图床均可访问。
+
+</Tab>
+</Tabs>
+
+输入也接受 `inline_data` / `file_data`、`mime_type` / `file_uri`。多张参考图使用多个 part，限制以当前模型与渠道为准；本轮没有穷举多图数量。省略尺寸不保证保留参考图的精确像素。
+
+## SSE 流式调用
+
+将方法改为 `streamGenerateContent?alt=sse`，请求体保持同一结构。交付选择与普通请求相同；下面请求 URL：
+
+```bash
+curl -N "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview:streamGenerateContent?alt=sse" \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{"parts": [{"text": "湖边的小木屋，清晨薄雾"}]}],
+    "generationConfig": {"responseModalities": ["TEXT"]},
+    "output_format": "png"
+  }'
+```
+
+完成事件的简化结构：
+
+```text
+data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"text":"https://example.com/images/result.png"},{"file_data":{"mime_type":"image/png","file_uri":"https://example.com/images/result.png"}}]},"finishReason":"STOP"}]}
+
+```
+
+换成 `["IMAGE"]` 后，图片 part 为 `inline_data`。URL 和 Base64 流式返回均已实测。仍须遵循分组强制策略，并对同一 URL 的两个引用去重。
+
+每个 `data:` 事件有 `candidates` 外壳，不要把根对象直接当作 `content`。当前发送的是完成图片，不承诺真实生成进度或中间预览帧；SSE 注释和保活不含图片。解析 JSON 后遍历 `candidates[].content.parts[]`，同时处理包含 `error` 的事件；不要只等待 `[DONE]` 才结束。
+
+## 错误、无图与验证边界
+
+先检查 HTTP 状态和错误内容；SSE 开始后的失败要检查流内 `error`。排查时保留 `responseId`、请求时间和错误说明，不要记录完整密钥。
+
+上游纯文本或审核响应可能返回 HTTP 200。没有图片时检查实际返回的文本、`finishReason`、`promptFeedback` 等字段，不要仅凭 HTTP 200 判定生图成功，也不要把普通文本当图片。
+
+2026 年 9 月 24 日的平台接口抽样覆盖了 Flash 文生图/图生图、URL/Base64、普通/SSE、PNG/WebP，以及 Pro 文生图 URL 和图生图 Base64。这是已验证的组合，不代表所有参数组合、4K、候选数量或第三方客户端渲染都已通过。

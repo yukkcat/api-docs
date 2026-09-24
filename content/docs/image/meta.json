@@ -2,5 +2,5 @@
   "title": "图像接口",
   "root": true,
   "defaultOpen": true,
-  "pages": ["gpt-image-2", "nano-banana"]
+  "pages": ["gpt-image-2", "nano-banana", "grok", "gemini", "openai-parameters", "openai-chat-responses"]
 }

@@ -1,0 +1,174 @@
+---
+title: Channel parameter overrides
+description: NewAPI channel overrides, URL/Base64 selection, and request-body passthrough caveats
+---
+
+This page is for NewAPI administrators. API callers can use [GPT Image](/en/docs/image/gpt-image-2), [Nano series](/en/docs/image/nano-banana), [Grok](/en/docs/image/grok), or [Gemini protocol](/en/docs/image/gemini) directly.
+
+**Request parameters** express a caller's choice, and **NewAPI overrides** modify the body sent downstream. Modifying a request body is not the same as directly rewriting a response: the result also depends on the target endpoint's supported parameters and the selected group's delivery behavior.
+
+## Select image delivery
+
+Choose the override field for the protocol being used:
+
+- OpenAI Images: `response_format: "url"` or `"b64_json"`.
+- Gemini: `generationConfig.responseModalities: ["TEXT"]` selects URL; including `"IMAGE"` selects Base64.
+- Responses: this platform supports top-level `response_format` for image delivery.
+- Chat: do not copy the Images string `response_format` into NewAPI Chat. The tested path rejects it during request parsing. Use the group default/force policy or the Images endpoint.
+
+A group that defaults to URL still allows Base64 requests. A group restricted to URL cannot be changed by a request override. Delivery is separate from image encoding; see [Dimensions and Output Formats](/en/docs/image/openai-parameters) for full precedence rules.
+
+## NewAPI override: request Base64
+
+Paste this JSON into the target channel's override editor. It requires a NewAPI version supporting `operations` and a processing path that actually executes overrides. This example is for **OpenAI Images**, not Chat.
+
+Original client request:
+
+```json
+{
+  "model": "nano-banana2",
+  "prompt": "A cat sitting by a window",
+  "response_format": "url"
+}
+```
+
+Channel override:
+
+```json
+{
+  "operations": [
+    { "path": "response_format", "mode": "set", "value": "b64_json" },
+    { "path": "output_format", "mode": "set", "value": "webp" }
+  ]
+}
+```
+
+The relevant outgoing fields become:
+
+```json
+{
+  "model": "nano-banana2",
+  "prompt": "A cat sitting by a window",
+  "response_format": "b64_json",
+  "output_format": "webp"
+}
+```
+
+This platform supports these parameters. Without a force-URL restriction, the result is `data[].b64_json` containing WebP bytes. `response_format` controls delivery; `output_format` controls encoding. Remove the second operation if you only need Base64.
+
+Overrides modify the outgoing request only. A force-URL group still returns URL. If the target is a different service, its actual support determines the outcome.
+
+## Supply defaults only
+
+Respect caller choices and supply values only when fields are missing:
+
+```json
+{
+  "operations": [
+    { "path": "image_size", "mode": "set", "value": "2K", "keep_origin": true },
+    { "path": "response_format", "mode": "set", "value": "url", "keep_origin": true }
+  ]
+}
+```
+
+For these `set` operations, `keep_origin: true` skips a target path that already exists. Omit it or use `false` to overwrite. An empty string is an existing field, not a missing one. This checks the body entering the override step, which may differ from the client's original body.
+
+Under this platform's sizing rules, explicit pixel `size` takes priority over `image_size`. Adding `image_size: "2K"` does not replace a caller's `size: "1024x1024"`. See [image parameters](/en/docs/image/openai-parameters) for the full ratio and resolution rules.
+
+## Gemini overrides
+
+Gemini does not use top-level `response_format` to select image delivery. For this platform's Gemini endpoint, override `generationConfig.responseModalities`.
+
+### Request URL
+
+```json
+{
+  "operations": [
+    {
+      "path": "generationConfig.responseModalities",
+      "mode": "set",
+      "value": ["TEXT"]
+    }
+  ]
+}
+```
+
+### Request Base64 and default to 2K
+
+```json
+{
+  "operations": [
+    {
+      "path": "generationConfig.responseModalities",
+      "mode": "set",
+      "value": ["IMAGE"]
+    },
+    {
+      "path": "generationConfig.imageConfig.imageSize",
+      "mode": "set",
+      "value": "2K",
+      "keep_origin": true
+    }
+  ]
+}
+```
+
+For an input containing only `contents`, the relevant outgoing fields become:
+
+```json
+{
+  "contents": [{"parts": [{"text": "A cat sitting by a window"}]}],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": {"imageSize": "2K"}
+  }
+}
+```
+
+This is a **platform compatibility convention**, not a universal delivery switch for every Google Gemini upstream:
+
+- `["TEXT"]` → plain URL text + `file_data.file_uri`, referencing the same image.
+- `["IMAGE"]` or `["TEXT", "IMAGE"]` → only `inline_data.data` Base64.
+- Omitted or an empty array → group default; a group force policy always wins.
+- Top-level `response_format` / `responseFormat` are ignored by this Gemini route; there is no `both` mode.
+
+To supply modalities only when absent, add `keep_origin: true` to its `set` operation. An existing empty array is also preserved, and the selected group's delivery behavior applies.
+
+## NewAPI request-body passthrough and overrides
+
+NewAPI request-body passthrough sends the original body downstream to avoid losing extension fields during protocol conversion. It does not bypass every entry validation or convert image URLs to Base64.
+
+**Do not assume passthrough and parameter overrides always execute together.** In the inspected NewAPI implementation, Images and Gemini body-passthrough branches use the original body, while `operations` run in the non-passthrough branch. Deployments may differ: verify the actual outgoing request in logs, not just whether the editor saved successfully.
+
+Choose configuration according to the goal:
+
+- To add or replace fields in NewAPI, confirm the selected request path executes overrides and inspect the outgoing body.
+- To retain client extensions with NewAPI body passthrough, have callers send those fields explicitly; do not assume overrides still run.
+
+The NewAPI Chat string `response_format` conflict can occur before forwarding, so enabling passthrough is not a guaranteed fix. See [Chat / Responses image generation](/en/docs/image/openai-chat-responses) for the tested approach.
+
+## Responses tool parameters
+
+If the first item in `tools` is known to be `image_generation`, override its fields directly:
+
+```json
+{
+  "operations": [
+    { "path": "tools.0.output_format", "mode": "set", "value": "webp" }
+  ]
+}
+```
+
+Do not hard-code index `0` when tool order varies. Platform image processing prioritizes tool-level dimensions, quality, and encoding; changing only a top-level field may have no effect. Whether NewAPI executes the override still depends on its request processing path.
+
+## When an override has no effect
+
+Check in order:
+
+1. Confirm the group, channel, model, and protocol actually selected for the request.
+2. Compare the client request with the outgoing request. Verify that overrides executed and extensions survived; inspect multipart parts rather than only JSON.
+3. Check whether the selected group restricts delivery and whether the target endpoint supports the overridden parameters.
+4. Compare the raw upstream response with the final response to distinguish upstream errors, platform processing errors, and client parsing errors.
+5. If image download fails, retry the existing URL first. If the image is not displayed, check protocol fields before generating again.
+
+An override does not itself download a URL and encode its image as Base64, nor make an unsupported upstream parameter work. Diagnostic logs can retain redacted request bodies, response summaries, and call IDs; do not store complete API keys or unnecessary full image Base64.

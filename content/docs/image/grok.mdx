@@ -1,0 +1,84 @@
+---
+title: Grok 图像
+description: Grok 的 OpenAI Images 文生图、图生图与 URL / Base64 返回示例
+---
+
+`grok-imagine-image-2.0` 使用平台的 OpenAI Images 入口，与 [GPT Image](/docs/image/gpt-image-2)、[Nano](/docs/image/nano-banana) 共用请求和返回结构。使用控制台分配的模型名，不必修改或拆分后缀。
+
+2026-09-24 复测已验证此模型的文生图 Base64、multipart 图生图 URL。示例说明的是 Klong 的兼容接口，不代表 xAI 官方所有模型、参数与端点的能力。
+
+## 文生图：Base64
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "grok-imagine-image-2.0",
+    "prompt": "在白色背景中央画一个蓝色圆形，简洁插画，无文字",
+    "response_format": "b64_json"
+  }'
+```
+
+返回节选：
+
+```json
+{
+  "created": 1790264086,
+  "data": [
+    {
+      "b64_json": "<IMAGE_BASE64>",
+      "revised_prompt": "在白色背景中央画一个蓝色圆形，简洁插画，无文字"
+    }
+  ]
+}
+```
+
+`b64_json` 是裸 Base64，没有 `data:image/...;base64,` 前缀。本次默认生成结果解码为 JPEG；需要固定文件编码时使用公共参数 `output_format`，不要通过文件后缀推断编码。Grok 的所有编码组合尚未逐项实测。
+
+## 图生图：URL
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=grok-imagine-image-2.0" \
+  -F "prompt=把参考图中的蓝色圆形改成红色，保留白色背景与其它图形" \
+  -F "response_format=url" \
+  -F "image=@reference.png"
+```
+
+让 cURL 自动生成 multipart 的 `Content-Type` 和 boundary，不要手动写成 `application/json`。
+
+```json
+{
+  "created": 1790264088,
+  "data": [
+    {
+      "url": "https://example.com/images/result.jpg",
+      "revised_prompt": "把参考图中的蓝色圆形改成红色，保留白色背景与其它图形"
+    }
+  ]
+}
+```
+
+取 `data[].url` 下载图片，不是从 `choices` 或 Gemini `parts` 中取。下载图片时不需要附带 API 密钥。图片 URL 是结果地址，不是新的生图请求。
+
+## 参数与兼容范围
+
+| 需求 | 用法与限制 |
+| --- | --- |
+| URL / Base64 | Images 用 `response_format: "url"` / `"b64_json"`，受分组强制策略约束 |
+| 缺省返回方式 | 跟随分组默认，不要假设所有分组都一样 |
+| PNG / JPEG / WebP | 使用 `output_format`；格式处理规则见公共参数，本次 Grok 默认 JPEG 已验证 |
+| 尺寸、比例、档位 | 使用公共尺寸字段；Grok 本轮未逐项验证这些控制效果 |
+| 图片数量 | 先用单张；不要照搬其他模型的多图上限 |
+| Chat / Responses / SSE | 本轮未验证 Grok 的这些组合，建议先用本页 Images 主路径 |
+| 遮罩、透明背景、压缩质量 | 当前接口不支持这些参数控制 |
+
+公共规则与四种返回策略见[尺寸与返回格式](/docs/image/openai-parameters)。分组采用强制 URL 或强制 Base64 时，请求参数不能覆盖该返回方式。
+
+## 上游 502 怎么判断
+
+遇到 HTTP 502 和 `Upstream temporarily unavailable, please retry later` 时，不能仅凭文案断言是密钥、额度或某个参数的问题。2026-09-24 的这组复测未复现此前 502，但不构成永久可用或速度保证。
+
+排查时保留请求 ID、HTTP 状态、返回的错误信息和提交给平台的请求参数。不要为了尝试消除 502 反复切换 URL / Base64 或盲目重生；先区分生成失败与图片下载失败，后者优先重试原图片 URL。

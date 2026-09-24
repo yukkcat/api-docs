@@ -6,6 +6,7 @@ import {
   ImageIcon,
   MessageSquareText,
   ShoppingBag,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -13,22 +14,24 @@ import Link from 'next/link';
 const copy = {
   'zh-CN': {
     title: 'Klong API 接口文档',
-    description: 'OpenAI 兼容接口',
+    description: 'OpenAI 兼容接口与 Gemini 协议',
     console: 'API 控制台',
     shop: '购买额度',
     sections: [
-      ['图像接口', 'GPT Image 2 / 2.5 与 Nano Banana 的生成和编辑调用'],
+      ['图像接口', 'GPT Image、Nano 与 Grok 共用 OpenAI Images，Gemini 协议单独查阅'],
       ['对话接口', 'Chat Completions、Responses 与 Claude Messages'],
+      ['NewAPI 配置', '管理员渠道参数覆盖：默认值与图片返回参数'],
     ],
   },
   en: {
     title: 'Klong API Documentation',
-    description: 'OpenAI-compatible API',
+    description: 'OpenAI-compatible API and Gemini protocol',
     console: 'API Console',
     shop: 'Buy Credits',
     sections: [
-      ['Image API', 'Generate and edit images with GPT Image 2 / 2.5 and Nano Banana'],
+      ['Image API', 'Shared OpenAI Images for GPT Image, Nano, and Grok, plus a dedicated Gemini guide'],
       ['Chat API', 'Chat Completions, Responses, and Claude Messages'],
+      ['NewAPI Setup', 'Channel overrides for administrators: defaults and image response parameters'],
     ],
   },
 } satisfies Record<Locale, {
@@ -42,6 +45,7 @@ const copy = {
 const sections = [
   { href: '/docs/image/gpt-image-2', icon: ImageIcon },
   { href: '/docs/chat/chat-completions', icon: MessageSquareText },
+  { href: '/docs/admin/newapi-overrides', icon: SlidersHorizontal },
 ] as const;
 
 export default async function HomePage({ params }: PageProps<'/[lang]'>) {

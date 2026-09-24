@@ -9,6 +9,7 @@ import {
   Cpu,
   ImageIcon,
   MessageSquareText,
+  SlidersHorizontal,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -32,10 +33,17 @@ const tabs: DocsSection[] = [
   },
   {
     title: { 'zh-CN': '图像接口', en: 'Image API' },
-    description: { 'zh-CN': 'GPT Image 与 Nano Banana', en: 'GPT Image and Nano Banana' },
+    description: { 'zh-CN': 'GPT Image、Nano、Grok 与 Gemini 协议', en: 'GPT Image, Nano, Grok, and Gemini protocol' },
     href: '/docs/image/gpt-image-2',
     prefix: '/docs/image',
-    paths: ['/docs/image/gpt-image-2', '/docs/image/nano-banana'],
+    paths: [
+      '/docs/image/gpt-image-2',
+      '/docs/image/nano-banana',
+      '/docs/image/grok',
+      '/docs/image/gemini',
+      '/docs/image/openai-parameters',
+      '/docs/image/openai-chat-responses',
+    ],
     icon: ImageIcon,
   },
   {
@@ -50,6 +58,14 @@ const tabs: DocsSection[] = [
       '/docs/chat/models',
     ],
     icon: MessageSquareText,
+  },
+  {
+    title: { 'zh-CN': 'NewAPI 配置', en: 'NewAPI Setup' },
+    description: { 'zh-CN': '管理员渠道参数覆盖', en: 'Channel parameter overrides for administrators' },
+    href: '/docs/admin/newapi-overrides',
+    prefix: '/docs/admin',
+    paths: ['/docs/admin/newapi-overrides'],
+    icon: SlidersHorizontal,
   },
 ];
 

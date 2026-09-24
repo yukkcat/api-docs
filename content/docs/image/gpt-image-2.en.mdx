@@ -1,38 +1,32 @@
 ---
-title: GPT Image API
-description: GPT-Image text-to-image and editing endpoints, parameters, and examples
+title: GPT Image Series
+description: OpenAI Images generation, editing, responses, and streaming for the GPT Image series
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
-See [Models](/en/docs/models/overview) for model and channel details. This page covers endpoints, parameters, and request examples.
+The GPT Image series uses OpenAI-compatible endpoints. Examples use the tested `gpt-image-2-high` and `gpt-image-2-vip` identifiers. Use a model available to your key's group and preserve its complete name; do not split or replace suffixes. Existing names such as `gpt-image-2`, `gpt-image-2.5`, and `-exact` or `-1k` variants are not renamed by these examples. See [Models](/en/docs/models/overview) for groups and channel differences.
 
-Set `base_url` to `https://api.klong.lat/v1` and use the official SDK directly.
+The [Nano Banana series](/en/docs/image/nano-banana) shares the Images request and response structure; the [Gemini protocol](/en/docs/image/gemini) uses a different body. Dimensions, delivery, and file encodings are described in [OpenAI image parameters](/en/docs/image/openai-parameters). A shared format does not mean every model channel supports every extension.
 
-> Most applications only require `https://api.klong.lat`.
+## Endpoints and authentication
 
-```http
-POST https://api.klong.lat/v1/images/generations   # Text to image (application/json)
-POST https://api.klong.lat/v1/images/edits         # Image editing (multipart/form-data)
-Authorization: Bearer <API_KEY>
-```
+Use `https://api.klong.lat/v1` as the SDK `base_url`. The API root is `https://api.klong.lat`.
 
-## Parameters
-
-| Parameter | Required | Description |
+| POST path | Purpose | Image location |
 | --- | --- | --- |
-| `model` | Yes | Model name; see [Models](/en/docs/models/overview) for groups and channel capabilities |
-| `prompt` | Yes | Prompt text in English or Chinese |
-| `size` | No | `widthxheight` in pixels, such as `1024x1024` or `3840x2160`; both `-exact` variants return the exact requested dimensions |
-| `quality` | No | VIP is fixed to `medium`; High supports `medium` / `high`; the official channel supports `low` / `medium` / `high` / `xhigh` / `max` |
-| `n` | No | Number of images to generate; default: `1` |
-| `response_format` | No | `url` (default) or `b64_json` |
-| `stream` | No | With `true`, progress is sent over the current SSE connection |
-| `image` | For edits | Reference image file for `/edits`; repeat the field to upload multiple images |
+| `/v1/images/generations` | JSON text-to-image | `data[].url` or `data[].b64_json` |
+| `/v1/images/edits` | JSON or multipart editing | `data[].url` or `data[].b64_json` |
+| `/v1/chat/completions` | Messages for a GPT image model | Markdown images in `choices[].message.content` |
+| `/v1/responses` | `input` with the `image_generation` tool | Image tool `result` in `output[]` |
 
-## Quick start
+All requests use `Authorization: Bearer <API_KEY>`. The following examples target the GPT image channel; full Chat and Responses formats are in [Chat and Responses images](/en/docs/image/openai-chat-responses).
 
-<Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
+## Generate an image
+
+At minimum, supply `model` and `prompt`. For an initial integration, use `n: 1`, an explicit pixel size, and an explicit delivery format to verify that one image can be read correctly.
+
+<Tabs items={['cURL', 'Python']}>
 <Tab>
 
 ```bash
@@ -40,9 +34,12 @@ curl https://api.klong.lat/v1/images/generations \
   -H "Authorization: Bearer <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-image-2",
+    "model": "gpt-image-2-high",
     "prompt": "A misty mountain valley at dawn, cool blue palette, minimal illustration",
-    "size": "1024x1536"
+    "size": "1024x1024",
+    "response_format": "url",
+    "output_format": "webp",
+    "n": 1
   }'
 ```
 
@@ -56,246 +53,208 @@ pip install openai
 ```python
 from openai import OpenAI
 
-client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
-
-resp = client.images.generate(
-    model="gpt-image-2",
+client = OpenAI(
+    api_key="<API_KEY>",
+    base_url="https://api.klong.lat/v1",
+)
+result = client.images.generate(
+    model="gpt-image-2-high",
     prompt="A misty mountain valley at dawn, cool blue palette, minimal illustration",
-    size="1024x1536",
+    response_format="url",
+    size="1024x1024",
+    n=1,
+    extra_body={
+        "output_format": "webp",
+    },
 )
-
-print(resp.data[0].url)
+print(result.data[0].url)
 ```
 
-</Tab>
-<Tab>
-
-```bash
-npm install openai
-```
-
-```javascript
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  apiKey: "<API_KEY>",
-  baseURL: "https://api.klong.lat/v1",
-});
-
-const resp = await client.images.generate({
-  model: "gpt-image-2",
-  prompt: "A misty mountain valley at dawn, cool blue palette, minimal illustration",
-  size: "1024x1536",
-});
-
-console.log(resp.data[0].url);
-```
-
-</Tab>
-<Tab>
-
-```php
-<?php
-$ch = curl_init("https://api.klong.lat/v1/images/generations");
-curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
-        "Authorization: Bearer <API_KEY>",
-        "Content-Type: application/json",
-    ],
-    CURLOPT_POSTFIELDS => json_encode([
-        "model" => "gpt-image-2",
-        "prompt" => "A misty mountain valley at dawn, cool blue palette, minimal illustration",
-        "size" => "1024x1536",
-    ]),
-]);
-
-echo curl_exec($ch);
-```
-
-</Tab>
-<Tab>
-
-```go
-package main
-
-import (
-    "bytes"
-    "fmt"
-    "io"
-    "net/http"
-)
-
-func main() {
-    body := []byte(`{"model":"gpt-image-2","prompt":"A misty mountain valley at dawn, cool blue palette, minimal illustration","size":"1024x1536"}`)
-    req, _ := http.NewRequest("POST", "https://api.klong.lat/v1/images/generations", bytes.NewReader(body))
-    req.Header.Set("Authorization", "Bearer <API_KEY>")
-    req.Header.Set("Content-Type", "application/json")
-
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil { panic(err) }
-    defer resp.Body.Close()
-
-    data, _ := io.ReadAll(resp.Body)
-    fmt.Println(string(data))
-}
-```
-
-</Tab>
-<Tab>
-
-```java
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
-public class Main {
-  public static void main(String[] args) throws Exception {
-    String body = """
-      {"model":"gpt-image-2","prompt":"A misty mountain valley at dawn, cool blue palette, minimal illustration","size":"1024x1536"}
-      """;
-
-    HttpRequest request = HttpRequest.newBuilder()
-        .uri(URI.create("https://api.klong.lat/v1/images/generations"))
-        .header("Authorization", "Bearer <API_KEY>")
-        .header("Content-Type", "application/json")
-        .POST(HttpRequest.BodyPublishers.ofString(body))
-        .build();
-
-    var response = HttpClient.newHttpClient().send(
-        request, HttpResponse.BodyHandlers.ofString());
-    System.out.println(response.body());
-  }
-}
-```
-
-</Tab>
-<Tab>
-
-```csharp
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-
-using var client = new HttpClient();
-client.DefaultRequestHeaders.Authorization =
-    new AuthenticationHeaderValue("Bearer", "<API_KEY>");
-
-var response = await client.PostAsJsonAsync(
-    "https://api.klong.lat/v1/images/generations",
-    new {
-        model = "gpt-image-2",
-        prompt = "A misty mountain valley at dawn, cool blue palette, minimal illustration",
-        size = "1024x1536"
-    }
-);
-
-Console.WriteLine(await response.Content.ReadAsStringAsync());
-```
+Use `extra_body` for extension fields that your SDK does not expose as named arguments.
 
 </Tab>
 </Tabs>
 
-### Exact-size requests
+`n` defaults to `1`. Multiple-image behavior depends on the model and execution mode: in testing on September 24, 2026, a non-streaming `gpt-image-2-vip` Images request with `n: 2` returned only one image. `gpt-image-2-high` Images SSE returned two different images, generated sequentially. Prefer `n: 1` in production integrations; when requesting more, check the actual output count rather than treating HTTP 200 as proof that every image was delivered.
 
-When an image must match specific pixel dimensions, use `gpt-image-2-exact` or `gpt-image-2.5-exact` with `size` in `/generations`. See [Models](/en/docs/models/overview) for the processing rules.
+### Aspect ratio and resolution tier
 
-```bash
-curl https://api.klong.lat/v1/images/generations \
-  -H "Authorization: Bearer <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-image-2-exact",
-    "prompt": "A futuristic city at night, neon lighting, cinematic wide-angle composition",
-    "size": "3840x2160"
-  }'
-```
-
-The returned image is strictly `3840x2160`. For explicit pixel sizes, each edge must be between `64` and `4096` pixels and the total pixel count must not exceed `4096x4096`; a large aspect-ratio mismatch can crop or stretch the image.
-
-### Set a quality level
-
-Available `quality` values depend on the active channel; see [Models](/en/docs/models/overview) for the full comparison. The example below uses an official channel; switching to the other official model only changes `model`.
-
-For example, use an official-channel model with 4K and an explicit quality level:
-
-```bash
-curl https://api.klong.lat/v1/images/generations \
-  -H "Authorization: Bearer <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-image-2.5-sunburst",
-    "prompt": "Premium perfume campaign, black background, rim lighting, commercial photography",
-    "size": "3840x2160",
-    "quality": "xhigh"
-  }'
-```
-
-Check the Console and upstream service for the currently available parameters.
-
-### Generate multiple images - `n`
-
-```bash
-curl https://api.klong.lat/v1/images/generations \
-  -H "Authorization: Bearer <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-image-2",
-    "prompt": "A misty mountain valley at dawn, cool blue palette, minimal illustration",
-    "size": "1024x1024",
-    "n": 2
-  }'
-```
-
-The `data` array contains the requested number of images. Pass `n=2` in the SDK in the same way; `n` also works with `/edits`.
-
-### Image editing - cURL
-
-```bash
-curl https://api.klong.lat/v1/images/edits \
-  -H "Authorization: Bearer <API_KEY>" \
-  -F "model=gpt-image-2" \
-  -F "image=@otter.png" \
-  -F "prompt=Put a beret on the otter"
-```
-
-Do not pass `size` for edits; the output follows the reference image dimensions. Do not set the multipart boundary manually.
-
-### Multiple reference images - cURL
-
-Repeat the same field name. Order is preserved, so the prompt can refer to the first and second images:
-
-```bash
-curl https://api.klong.lat/v1/images/edits \
-  -H "Authorization: Bearer <API_KEY>" \
-  -F "model=gpt-image-2" \
-  -F "image[]=@teapot.png" \
-  -F "image[]=@duck.png" \
-  -F "prompt=Place the yellow duck from the second image beside the teapot in the first image, preserving the table and lighting"
-```
-
-Both `image[]` and `image` are accepted. Repeating either field uploads multiple images. The official SDK sends `image[]` for arrays.
-
-### Multiple reference images - Python (OpenAI SDK)
-
-```python
-resp = client.images.edit(
-    model="gpt-image-2",
-    image=[open("teapot.png", "rb"), open("duck.png", "rb")],
-    prompt="Place the yellow duck from the second image beside the teapot in the first image",
-)
-```
-
-## Response
+When exact pixels are not required, replace `size` with:
 
 ```json
 {
-  "created": 1781837823,
-  "data": [
-    { "url": "https://<DOWNLOAD_HOST>/generated/<FILE>.png" }
-  ]
+  "aspect_ratio": "16:9",
+  "image_size": "2K"
 }
 ```
 
-Without `response_format`, the API returns `url`. With `response_format=b64_json`, each item becomes `{"b64_json": "..."}`. When `n>1`, the `data` array contains multiple images in order.
+An explicit pixel `size` takes precedence over these fields. A ratio and tier do not guarantee fixed pixels: the tested GPT `16:9 + 2K` output was `2560x1440`; `image_size: "2K"` alone produced `2048x2048`. Final dimensions also depend on channel processing.
+
+One request using only `aspect_ratio: "16:9"` was translated to `1024x576` and rejected by the upstream minimum-pixel constraint. Success on an identical retry does not establish that the combination is reliable. For initial integrations, prefer tested explicit dimensions such as `1024x1024` or `1536x1024`. See [OpenAI image parameters](/en/docs/image/openai-parameters) for the complete rules.
+
+## Edit an image
+
+Provide `prompt` and at least one reference image. You can also set `aspect_ratio`, `image_size`, `size`, `response_format`, and `output_format`. Omitted dimensions are left to the upstream service; the reference image's exact pixels are not guaranteed.
+
+### JSON: URL or Data URL
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2-vip",
+    "prompt": "Put a beret on the otter, preserving the original lighting",
+    "reference_images": ["data:image/png;base64,<PNG_BASE64>"],
+    "size": "1024x1024",
+    "n": 1,
+    "response_format": "b64_json",
+    "output_format": "png"
+  }'
+```
+
+Replace `<PNG_BASE64>` with real image data, or supply an HTTPS image URL accessible to the server in the `reference_images` array. The platform also accepts reference fields such as `image`, `image_url`, and `images`; use one form per request. Multiple-reference support and results depend on the channel; not every combination has been tested.
+
+GPT `/generations` also enters the edit flow when references are supplied. New integrations should explicitly use `/edits`.
+
+### multipart: local files
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=gpt-image-2-vip" \
+  -F "image=@input.png" \
+  -F "prompt=Change the blue circle to red, preserving the other elements" \
+  -F "size=1024x1024" \
+  -F "n=1" \
+  -F "response_format=url" \
+  -F "output_format=jpeg"
+```
+
+Use one `image` file field for a single reference. Repeat `image[]` for multiple references; upstream acceptance still depends on the channel. Let the client create the multipart boundary instead of manually setting `Content-Type`.
+
+```python
+with open("input.png", "rb") as reference:
+    result = client.images.edit(
+        model="gpt-image-2-vip",
+        image=reference,
+        prompt="Change the blue circle to red, preserving the other elements",
+        size="1024x1024",
+        n=1,
+        response_format="url",
+        extra_body={"output_format": "jpeg"},
+    )
+print(result.data[0].url)
+```
+
+## Read the result
+
+Delivery precedence is **the group's forced policy > the request's `response_format` > the group's default policy**. A group can default to URL or Base64, or force either format. The following examples assume no forced override. Omitting the selector does not mean every group returns URLs.
+
+### URL
+
+With `response_format: "url"`, images are in `data[].url`. This response omits some fields:
+
+```json
+{
+  "created": 1790120000,
+  "data": [
+    {
+      "url": "https://api.klong.lat/images/example.webp",
+      "revised_prompt": "A misty mountain valley at dawn, cool blue palette, minimal illustration"
+    }
+  ],
+  "usage": {"estimated": true}
+}
+```
+
+`usage` may also contain input, output, and total tokens; `estimated: true` identifies an estimated usage value. Use the URL from the actual response and copy images to your own storage when long-term retention is needed.
+
+### Base64
+
+Set `response_format: "b64_json"` to receive image items in this form:
+
+```json
+{
+  "b64_json": "<WEBP_BASE64>",
+  "revised_prompt": "A misty mountain valley at dawn, cool blue palette, minimal illustration"
+}
+```
+
+`b64_json` encodes image bytes without a `data:` prefix. Specify `output_format` and save with the matching extension:
+
+```python
+import base64
+from pathlib import Path
+
+result = client.images.generate(
+    model="gpt-image-2-high",
+    prompt="A misty mountain valley at dawn, cool blue palette, minimal illustration",
+    response_format="b64_json",
+    size="1024x1024",
+    n=1,
+    extra_body={"output_format": "webp"},
+)
+Path("result.webp").write_bytes(base64.b64decode(result.data[0].b64_json))
+```
+
+## Images streaming
+
+Add `"stream": true` to JSON, or `-F "stream=true"` to multipart. With cURL, use `-N` to disable output buffering.
+
+```bash
+curl -N https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-image-2-high","prompt":"Draw a tree","size":"1024x1024","n":1,"stream":true,"response_format":"url","output_format":"png"}'
+```
+
+```text
+event: image_generation.completed
+data: {"type":"image_generation.completed","url":"https://example.com/result.png","output_format":"png","size":"1024x1024"}
+```
+
+This shows selected event fields. Edits return `image_edit.completed`, including references submitted to `/generations`. Each completed image produces a completion event; `size` contains that image's actual pixels.
+
+Images SSE follows the effective delivery policy: completion events contain `url` in URL mode or `b64_json` in Base64 mode. URL completion events are a platform compatibility extension; do not assume every official SDK can consume them directly. Streaming sends complete images, without intermediate frames or live progress percentages. Ignore SSE comments such as `: keep-alive`.
+
+## Verified scope and limitations
+
+Live testing on September 24, 2026 covered high generation, vip editing, URL/Base64, selected pixel sizes, PNG/JPEG/WebP, and Images SSE. This is not certification of every model and parameter combination.
+
+- The API does not currently support `mask` or `output_compression`. `background` does not provide transparent-background control.
+- `output_format` controls file encoding; JPEG, PNG, and WebP are separate from delivery format. The `jpg` alias for JPEG was tested.
+- Chat and Responses have separate limitations. Do not copy Images parameters unchanged; in particular, NewAPI Chat rejects the string image-delivery `response_format`. See [Chat and Responses images](/en/docs/image/openai-chat-responses).
+
+## Error handling
+
+Check the HTTP status before reading `error.message`. An edit without a reference image, for example, returns:
+
+```json
+{
+  "error": {
+    "message": "image file or image_url is required",
+    "type": "invalid_request_error",
+    "param": "image",
+    "code": "request_invalid"
+  }
+}
+```
+
+The SDK raises `APIStatusError` for unsuccessful HTTP responses:
+
+```python
+from openai import APIStatusError
+
+try:
+    result = client.images.generate(
+        model="gpt-image-2-high", prompt="Draw a tree",
+        size="1024x1024", n=1, response_format="url",
+    )
+except APIStatusError as exc:
+    body = exc.response.json()
+    error = body.get("error", {})
+    print(exc.status_code, error.get("code"), error.get("message"))
+```
+
+`type`, `param`, and `code` can vary or be absent. Correct invalid parameters; handle rate limits and upstream failures according to the HTTP status and error code, avoiding unconditional regeneration. After an Images SSE connection starts, it can emit `event: error` with the same error object in `data.error`; treat it as a failed request.

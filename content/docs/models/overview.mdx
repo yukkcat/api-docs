@@ -11,13 +11,13 @@ description: Klong API 模型分组、调用协议与渠道能力
 
 | 子组 | 模型 | 说明 |
 | --- | --- | --- |
-| 普通 | `gpt-image-2`、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` | 四个名称是同一个模型；图片经高质量 Lanczos 插值超分，支持 1K / 2K / 4K |
+| 普通 | `gpt-image-2`、`gpt-image-2.5`、`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` | 四个名称在本分组按同一模型处理；支持 1K / 2K / 4K 目标档位，实际生成和放大方式取决于渠道配置 |
 | 精确尺寸 | `gpt-image-2-exact`、`gpt-image-2.5-exact` | 两个名称是同一个模型；按 `size` 校正最终像素，支持 1K / 2K / 4K |
 | 1K 直出 | `gpt-image-2-1k`、`gpt-image-2.5-1k` | 官网 1K 直出，不做超分、缩放或其他后处理 |
 
 GPT-Image 分组（普通、精确尺寸和 1K 直出）价格均为 ¥0.02/张；预充或累计消费达到 ¥100 后，可联系申请调整为 ¥0.01/张。支持高并发，最高约 20,000 并发；实际稳定性取决于官网上游状态。
 
-普通子组的 `size` 是目标尺寸，不保证最终像素完全一致。例如请求 `1024x1024`，可能返回 `1250x1250` 或 `1249x1251`。`-exact` 会进行高质量 Lanczos 缩放与居中裁切，严格输出请求尺寸；比例差异较大时可能裁切，特殊比例可能出现视觉拉伸。
+普通子组的 `size` 是目标尺寸，不保证最终像素完全一致。需要精确像素时，使用 `-exact` 模型并显式传入 `size: "宽x高"`：最终采用 Lanczos 整图缩放到指定尺寸，不裁剪；原图比例不同时可能拉伸。只传 `aspect_ratio` 或 `image_size` 不触发精确尺寸处理，详见 [尺寸与返回格式](/docs/image/openai-parameters)。
 
 ## 画图分组
 
@@ -25,8 +25,11 @@ GPT-Image 分组（普通、精确尺寸和 1K 直出）价格均为 ¥0.02/张�
 | --- | --- | --- |
 | `gpt-image-2-vip` | OpenAI Images API | `quality` 固定为 `medium`，支持原生最高 4K |
 | `gpt-image-2-high` | OpenAI Images API | `quality` 支持 `medium` / `high`，支持原生最高 4K |
-| `nano-banana2` | OpenAI Images API（NewAPI 中转） | 使用 OpenAI Images API，不使用 Gemini 原生请求格式 |
-| `nano-banana-pro` | OpenAI Images API（NewAPI 中转） | 使用 OpenAI Images API，不使用 Gemini 原生请求格式 |
+| `nano-banana2` | OpenAI Images API（NewAPI 中转） | 与 GPT Image 共用生成、编辑和 URL / Base64 返回结构 |
+| `nano-banana-pro` | OpenAI Images API（NewAPI 中转） | 与 GPT Image 共用生成、编辑和 URL / Base64 返回结构 |
+| `grok-imagine-image-2.0` | OpenAI Images API（NewAPI 中转） | 已验证单图生成与 multipart 编辑，见 [Grok 接口](/docs/image/grok) |
+
+以上渠道能力说明不等同于逐参数验收。2026-09-24 实测覆盖 GPT High / VIP、Nano2 / Pro 与 Grok 的主要生成、编辑场景，未穷举 4K 或所有参数组合。`n` 返回不足、GPT 仅比例尺寸及 Chat 格式选择的当前边界，见[公共参数](/docs/image/openai-parameters#当前限制与错误处理)。
 
 ## image2.5 官方渠道
 
@@ -41,7 +44,7 @@ GPT-Image 分组（普通、精确尺寸和 1K 直出）价格均为 ¥0.02/张�
 
 | 模型 | 协议 | 请求入口 |
 | --- | --- | --- |
-| `gemini-3.1-flash-image-preview` | Gemini 官方原生协议 | `POST /v1beta/models/{model}:generateContent` |
-| `gemini-3-pro-image-preview` | Gemini 官方原生协议 | `POST /v1beta/models/{model}:generateContent` |
+| `gemini-3.1-flash-image-preview` | Gemini 兼容协议 | `POST /v1beta/models/{model}:generateContent` |
+| `gemini-3-pro-image-preview` | Gemini 兼容协议 | `POST /v1beta/models/{model}:generateContent` |
 
-香蕉分组使用 Gemini 原生请求体；不要把这两个模型放到 OpenAI Images API 的请求中。完整请求格式见 [Nano Banana 文档](/docs/image/nano-banana)。
+香蕉分组的 Gemini 调用方式见 [Gemini 协议](/docs/image/gemini)。需要 OpenAI Images 调用时，先看 [Nano 系列](/docs/image/nano-banana)，选择控制台已开放 OpenAI 路由的模型。模型名本身不决定协议，实际支持范围以分组和渠道为准。

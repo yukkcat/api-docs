@@ -1,0 +1,266 @@
+---
+title: Gemini Protocol
+description: Gemini generation, image editing, URL and Base64 selectors, and SSE response shapes
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
+Gemini image requests use `contents` and `generationConfig`, with results in `candidates[].content.parts[]`. This page covers the platform's `gemini-3.1-flash-image-preview` and `gemini-3-pro-image-preview`; use the complete model name supplied by your group.
+
+Your API key must belong to a Gemini protocol group. Nano models use [OpenAI Images](/en/docs/image/nano-banana) and do not need Gemini requests. A model name does not imply access across groups or identical capabilities across channels.
+
+This page describes Klong's Gemini-compatible endpoint. Using `responseModalities` to select URL/Base64 is this platform's compatibility convention, not a rule to apply to every Google Gemini service.
+
+## Endpoints and authentication
+
+| Purpose | POST URL |
+| --- | --- |
+| Generate or edit | `https://api.klong.lat/v1beta/models/{model}:generateContent` |
+| Generate or edit with SSE | `https://api.klong.lat/v1beta/models/{model}:streamGenerateContent?alt=sse` |
+
+Replace `{model}` with the complete model name. Send a JSON body. Examples use `Authorization: Bearer <API_KEY>`; the platform also accepts `x-goog-api-key: <API_KEY>`. Prefer a header rather than putting credentials in URLs that may be logged or shared.
+
+## Generate an image: URL delivery
+
+On this platform, `responseModalities: ["TEXT"]` means generate an image and deliver its URL, not generate only ordinary text. This example applies to groups with either default policy; an administrator's force policy takes priority over the request.
+
+```bash
+curl "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview:generateContent" \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "role": "user",
+      "parts": [{"text": "A red apple on a wooden table, soft studio light, minimal background"}]
+    }],
+    "generationConfig": {
+      "responseModalities": ["TEXT"],
+      "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"}
+    },
+    "output_format": "png"
+  }'
+```
+
+Example response, with placeholder IDs/URLs and usage omitted:
+
+```json
+{
+  "candidates": [{
+    "index": 0,
+    "content": {
+      "role": "model",
+      "parts": [
+        {"text": "https://example.com/images/result.png"},
+        {"file_data": {
+          "mime_type": "image/png",
+          "file_uri": "https://example.com/images/result.png"
+        }}
+      ]
+    },
+    "finishReason": "STOP"
+  }],
+  "modelVersion": "gemini-3.1-flash-image-preview",
+  "responseId": "<RESPONSE_ID>"
+}
+```
+
+`text` is a plain URL, not a Markdown image. It and `file_data.file_uri` refer to **the same image**. There is no `inline_data` or full Base64 payload.
+
+Prefer `file_data.file_uri` when displaying the result. Do not display the identical `text` URL as a second image. Only consider a text URL when no structured image field is available, and deduplicate URLs. Save images you need to retain; if downloading fails, retry the original URL before generating again.
+
+## Generate an image: Base64 delivery
+
+Keep the request structure and change only `responseModalities` to `["IMAGE"]`:
+
+```json
+{
+  "contents": [{
+    "role": "user",
+    "parts": [{"text": "A red apple on a wooden table, soft studio light, minimal background"}]
+  }],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"}
+  },
+  "output_format": "png"
+}
+```
+
+Example response:
+
+```json
+{
+  "candidates": [{
+    "index": 0,
+    "content": {
+      "role": "model",
+      "parts": [
+        {"inline_data": {
+          "mime_type": "image/png",
+          "data": "<PNG_BASE64>"
+        }}
+      ]
+    },
+    "finishReason": "STOP"
+  }],
+  "modelVersion": "gemini-3.1-flash-image-preview",
+  "responseId": "<RESPONSE_ID>"
+}
+```
+
+`inline_data.data` contains Base64 image bytes without a `data:image/png;base64,` prefix. No image URL is returned alongside it. Image data fields use snake_case; `finishReason`, `modelVersion`, and `responseId` retain the spelling shown above.
+
+### Selection rules
+
+| `generationConfig.responseModalities` | Result under a default group policy |
+| --- | --- |
+| `["TEXT"]` | Plain URL text + `file_data`, both referring to one image |
+| `["IMAGE"]` | Only `inline_data` Base64 |
+| `["TEXT", "IMAGE"]` | Only `inline_data` Base64, not both delivery modes |
+| Omitted or an empty array | Group default delivery |
+
+Priority: **group force policy > request modalities > group default**. For example, a force-URL group returns a URL even for `["IMAGE"]`. In the September 24, 2026 live sample, omitting modalities returned a URL; that was the tested group's default, not a universal deployment default.
+
+Gemini routes ignore top-level `response_format` and `responseFormat`; do not use them to select delivery. There is no current `both` mode. See [channel parameter overrides](/en/docs/admin/newapi-overrides) for administrator configuration.
+
+## Ratio, resolution, and encoding
+
+| Field | Purpose |
+| --- | --- |
+| `generationConfig.imageConfig.aspectRatio` | A ratio such as `1:1`, `16:9`, `9:16`, `4:3`, or `3:4` |
+| `generationConfig.imageConfig.imageSize` | A tier such as `1K`, `2K`, or `4K`, subject to model and channel support |
+| Top-level `output_format` | Actual encoding: `png`, `jpeg`, or `webp`; `jpg` means `jpeg` |
+
+You can supply a ratio or tier alone. Omitting both leaves selection to the upstream. Omit `aspectRatio` rather than sending `"auto"`. A tier is not an exact pixel size: the Flash `16:9 + 2K` sample returned `2752×1536`, not a fixed `2048×1152`. This round did not test 4K; support is not promised for every channel.
+
+The platform also accepts top-level `size`, `aspect_ratio`, and `image_size`. A top-level field takes priority over its `imageConfig` counterpart; an explicit pixel `size` takes priority over ratios and tiers. For a native Gemini upstream, pixel targets map to an applicable ratio and tier; exact final resizing depends on channel configuration. See [image parameters](/en/docs/image/openai-parameters).
+
+`output_format` is a platform extension independent of URL/Base64 delivery. Omitting it preserves the processed encoding. Read the returned `mime_type` rather than inferring the encoding from a filename. An intervening relay must preserve this extension; do not assume every Gemini upstream accepts it directly.
+
+## Python: read an image
+
+This requests PNG Base64 but also handles a group that forces URL delivery. Only structured image fields count as results, preventing URL text from being displayed as a duplicate image.
+
+```python
+import base64
+from pathlib import Path
+import requests
+
+response = requests.post(
+    "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview:generateContent",
+    headers={"Authorization": "Bearer <API_KEY>"},
+    json={
+        "contents": [{"parts": [{"text": "A red apple on a wooden table"}]}],
+        "generationConfig": {"responseModalities": ["IMAGE"]},
+        "output_format": "png",
+    },
+    timeout=300,
+)
+response.raise_for_status()
+payload = response.json()
+extensions = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
+seen_urls = set()
+image_count = 0
+
+for candidate in payload.get("candidates", []):
+    for part in candidate.get("content", {}).get("parts", []):
+        inline = part.get("inline_data") or part.get("inlineData")
+        file = part.get("file_data") or part.get("fileData")
+        if inline:
+            mime = inline.get("mime_type") or inline.get("mimeType")
+            image_count += 1
+            path = Path(f"image-{image_count}.{extensions.get(mime, 'bin')}")
+            path.write_bytes(base64.b64decode(inline["data"], validate=True))
+            print(path)
+        elif file:
+            url = file.get("file_uri") or file.get("fileUri")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                image_count += 1
+                print(url)
+
+if image_count == 0:
+    raise RuntimeError("No structured image result; inspect text, finishReason, and error logs")
+```
+
+The parser additionally accepts camelCase image fields for other upstreams; this platform's standard response examples use snake_case. The 300-second client timeout is an example, not a server completion guarantee.
+
+## Reference images and editing
+
+Editing also calls `generateContent`. Put the prompt and references in the same `parts` array. Input encoding and output delivery are independent: a Base64 reference can produce a URL result.
+
+<Tabs items={['Base64 reference', 'URL reference']}>
+<Tab>
+
+```json
+{
+  "contents": [{
+    "role": "user",
+    "parts": [
+      {"text": "Change the blue circle to red and preserve the other elements"},
+      {"inlineData": {"mimeType": "image/png", "data": "<PNG_BASE64>"}}
+    ]
+  }],
+  "generationConfig": {"responseModalities": ["TEXT"]},
+  "output_format": "png"
+}
+```
+
+Set `data` to bare Base64 and `mimeType` to the actual encoding. This input form was live-tested with Flash and Pro. The example selects URL delivery.
+
+</Tab>
+<Tab>
+
+```json
+{
+  "contents": [{
+    "role": "user",
+    "parts": [
+      {"text": "Change the blue circle to red and preserve the other elements"},
+      {"fileData": {"mimeType": "image/png", "fileUri": "https://example.com/input.png"}}
+    ]
+  }],
+  "generationConfig": {"responseModalities": ["IMAGE"]}
+}
+```
+
+Replace the example with a URL the server can access. The platform parser supports this input form; this test round mainly used Base64 references and does not establish access to every external image host.
+
+</Tab>
+</Tabs>
+
+Input also accepts `inline_data` / `file_data` and `mime_type` / `file_uri`. Use multiple parts for multiple references, within model and channel limits; this round did not exhaustively test reference counts. Omitting dimensions does not guarantee the reference's exact pixel size.
+
+## SSE streaming
+
+Change the method to `streamGenerateContent?alt=sse` and keep the same request shape. Delivery selection matches normal requests; this example asks for a URL:
+
+```bash
+curl -N "https://api.klong.lat/v1beta/models/gemini-3.1-flash-image-preview:streamGenerateContent?alt=sse" \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{"parts": [{"text": "A small cabin beside a lake in morning mist"}]}],
+    "generationConfig": {"responseModalities": ["TEXT"]},
+    "output_format": "png"
+  }'
+```
+
+Simplified completion event:
+
+```text
+data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"text":"https://example.com/images/result.png"},{"file_data":{"mime_type":"image/png","file_uri":"https://example.com/images/result.png"}}]},"finishReason":"STOP"}]}
+
+```
+
+With `["IMAGE"]`, the image part is `inline_data`. URL and Base64 streaming were both live-tested. Force policies still apply; deduplicate the two references to the same URL.
+
+Each `data:` event has a `candidates` wrapper; its root is not a `content` object. These are completed images, not a promise of real generation progress or intermediate preview frames. SSE comments and keep-alives contain no image. Parse JSON, iterate over `candidates[].content.parts[]`, and handle events containing `error`. Do not require `[DONE]` to recognize the end of the stream.
+
+## Errors, missing images, and test boundaries
+
+Check HTTP status and error content first. After SSE begins, inspect stream-level `error` events. Retain the `responseId`, request time, and error message for troubleshooting, but never record a complete API key.
+
+An upstream text-only or safety response may use HTTP 200. If there is no image, inspect the actual text, `finishReason`, `promptFeedback`, and other available fields. HTTP 200 alone is not proof of image generation, and ordinary text is not an image.
+
+The September 24, 2026 platform API sample covered Flash generation/editing, URL/Base64, normal/SSE, PNG/WebP, plus Pro generation to URL and editing to Base64. These are verified combinations, not a claim that every parameter combination, 4K, candidate count, or third-party renderer has passed.

@@ -1,0 +1,230 @@
+---
+title: Chat / Responses Images
+description: Message inputs, image tools, response formats, and SSE for OpenAI image models
+---
+
+This page describes the platform's `/v1/chat/completions` and `/v1/responses` image endpoints. Tests on September 24, 2026 covered `nano-banana2` Chat text-to-image SSE and non-streaming editing, plus `gpt-image-2-vip` Responses generation with non-streaming URL and SSE Base64 output. Other model and endpoint combinations require channel support; replacing the model name does not establish compatibility.
+
+See [GPT Image series](/en/docs/image/gpt-image-2) for basic Images generation and editing, and [OpenAI image parameters](/en/docs/image/openai-parameters) for dimensions, exact resizing, and encodings. All requests use `Authorization: Bearer <API_KEY>`. There is no separate `/chat` endpoint.
+
+## Chat Completions
+
+Select an image model with Chat generation enabled and provide `messages`. Regular text models continue through the text chat flow. Start with one image:
+
+```bash
+curl https://api.klong.lat/v1/chat/completions \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nano-banana2",
+    "messages": [{"role": "user", "content": "Draw a tree in a minimal illustration style"}],
+    "size": "1024x1024",
+    "output_format": "jpeg",
+    "n": 1
+  }'
+```
+
+The current NewAPI endpoint rejects string values such as `response_format: "url"` or `"b64_json"` in Chat requests before forwarding them. It returns HTTP 400 because `GeneralOpenAIRequest.response_format` cannot decode a string. Standard Chat uses this field for [structured text output](https://developers.openai.com/api/docs/guides/structured-outputs), unlike the Images delivery selector. Putting it in the SDK's `extra_body` does not bypass that parsing.
+
+The Chat examples therefore omit `response_format` and use the group's delivery policy. Use the [Images API](/en/docs/image/gpt-image-2) to explicitly select URL or Base64 per request. See [channel parameter overrides](/en/docs/admin/newapi-overrides) for NewAPI setup caveats.
+
+Multiple-image support depends on the channel. If several images are returned, they appear in one assistant message rather than separate Chat choices. This test run covered one image only; delivery of the requested count for `n > 1` is not guaranteed.
+
+### Reference images
+
+For editing, replace `content` with text and image blocks:
+
+```json
+{
+  "model": "nano-banana2",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Put a beret on the otter"},
+        {
+          "type": "image_url",
+          "image_url": {"url": "data:image/png;base64,<PNG_BASE64>"}
+        }
+      ]
+    }
+  ],
+  "size": "1024x1024",
+  "n": 1,
+  "output_format": "png"
+}
+```
+
+`image_url.url` can also be an HTTPS image URL accessible to the server. Use multiple image blocks for multiple references.
+
+### Chat response and SDK
+
+Images appear as Markdown in `choices[0].message.content`. This is an excerpt:
+
+```json
+{
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "![image_1](https://example.com/result.jpg)"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+```
+
+The current group default produced the Markdown URL shown above in live tests. When configured for Base64 delivery, the platform's Chat envelope uses `![image_1](data:image/jpeg;base64,<JPEG_BASE64>)`, rather than adding the Images API's `data[].b64_json` field. That group configuration was not separately switched and tested live in this run.
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
+result = client.chat.completions.create(
+    model="nano-banana2",
+    messages=[{"role": "user", "content": "Draw a tree"}],
+    extra_body={
+        "size": "1024x1024",
+        "output_format": "jpeg",
+        "n": 1,
+    },
+)
+print(result.choices[0].message.content)
+```
+
+Here, `extra_body` carries only platform image dimensions, encoding, and count options, without string `response_format`. Extract the image link from Markdown; do not treat the entire `content` string as a plain URL.
+
+### Chat streaming
+
+Add `"stream": true` and concatenate `choices[].delta.content`. Markdown is sent after the image completes, followed by a stop chunk, usage chunk, and `[DONE]`. Intermediate image frames are not streamed. Simplified events:
+
+```text
+data: {"choices":[{"index":0,"delta":{"role":"assistant","content":"![image_1](https://example.com/result.jpg)"},"finish_reason":null}]}
+
+data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: {"choices":[],"usage":{"estimated":true}}
+
+data: [DONE]
+```
+
+A usage chunk can have an empty `choices` array; do not access `choices[0]` unconditionally. Allow enough receive timeout for image generation. `stream` does not mean the image content is sent immediately.
+
+The standard Chat SSE test initially returned 400 and succeeded on retry. These examples describe usable request and response structures, not a guarantee that every upstream generation succeeds.
+
+## Responses
+
+Supply `input` and select image generation with `image_generation` in `tools`. The platform's Responses endpoint currently returns one image per request; `n` does not increase the image count. This example uses the tested `gpt-image-2-vip` model:
+
+```bash
+curl https://api.klong.lat/v1/responses \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2-vip",
+    "input": "Draw a tree in a minimal illustration style",
+    "tools": [{
+      "type": "image_generation",
+      "size": "1024x1024",
+      "output_format": "png"
+    }],
+    "response_format": "url"
+  }'
+```
+
+Dimensions, `quality`, and `output_format` can be top-level fields or image-tool options. Tool settings override the same options first, followed by pixel `size` precedence. Keep these options together in the image tool, as shown above.
+
+Top-level `response_format: "url" | "b64_json"` is a platform Responses image extension verified through the current NewAPI endpoint. It is not a promise of support from other providers. Omitting it uses the group default; forced URL or Base64 policies override the requested format. See [image delivery policies](/en/docs/image/openai-parameters).
+
+### Responses reference images
+
+Use a message array for reference-image input, with `input_image` image blocks and `input_text` text blocks. The following is a supported platform request structure; Responses editing was not separately retested in this run. See [Images editing](/en/docs/image/gpt-image-2) for the tested editing endpoint.
+
+```json
+{
+  "model": "gpt-image-2-vip",
+  "input": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "input_text", "text": "Put a beret on the otter"},
+        {"type": "input_image", "image_url": "data:image/png;base64,<PNG_BASE64>"}
+      ]
+    }
+  ],
+  "tools": [{"type": "image_generation", "size": "1024x1024", "output_format": "webp"}],
+  "response_format": "b64_json"
+}
+```
+
+### Responses output and SDK
+
+Find items in `output[]` with `type: "image_generation_call"` instead of assuming a fixed array position or text message. Response excerpt:
+
+```json
+{
+  "id": "resp_example",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "ig_1",
+      "type": "image_generation_call",
+      "status": "completed",
+      "result": "https://example.com/result.png",
+      "revised_prompt": "Draw a tree in a minimal illustration style"
+    }
+  ]
+}
+```
+
+When delivered as URL, `result` is an image URL. When delivered as Base64, it is raw Base64 without a `data:image/...;base64,` prefix. Both modes preserve the Responses envelope. The following requests WebP Base64, subject to any forced group policy:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
+result = client.responses.create(
+    model="gpt-image-2-vip",
+    input="Draw a tree",
+    extra_body={
+        "tools": [{
+            "type": "image_generation",
+            "size": "1024x1024",
+            "output_format": "webp",
+        }],
+        "response_format": "b64_json",
+    },
+)
+for item in result.output:
+    if item.type == "image_generation_call":
+        print(item.result)
+```
+
+### Responses streaming
+
+Add `"stream": true`. Read the JSON `type` in each SSE `data:` payload:
+
+| `type` | Client handling |
+| --- | --- |
+| `response.created` / `response.in_progress` | Track response status |
+| `response.output_item.done` | Check `item.type` and read image `item.result` |
+| `response.completed` | Complete response in `response`, images in `response.output[]` |
+| `response.done` | Compatibility end event; images may already have been read |
+
+```text
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"ig_1","type":"image_generation_call","status":"completed","result":"<WEBP_BASE64>"}}
+```
+
+In the live Responses SSE test, the same `ig_1` appeared in `response.output_item.done`, `response.completed`, and `response.done`. These events report completion of one image, not three images. Deduplicate image items by `id` within the same response.
+
+The tested stream did not include `data: [DONE]`. Do not keep waiting for that marker: use completion events to determine that the response finished. A client can also recognize `[DONE]` if another channel emits it. Image results arrive after generation completes; there are no Images SSE `image_generation.completed` events or intermediate image frames.
+
+## Failures and parsing
+
+Chat and Responses image generation can fail before SSE starts and return a normal unsuccessful HTTP JSON response. Check the status and `Content-Type` before choosing JSON or SSE parsing. See [GPT Image error handling](/en/docs/image/gpt-image-2#error-handling) for the error envelope and Python SDK handling.
+
+A stream parser should ignore SSE comments, recognize `[DONE]`, and handle error objects in responses. A connection ending without a successful image or completed result must not be treated as successful generation.

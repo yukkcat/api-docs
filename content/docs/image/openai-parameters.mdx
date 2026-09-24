@@ -1,0 +1,151 @@
+---
+title: 尺寸与返回格式
+description: OpenAI 图片请求的尺寸优先级、返回方式、真实文件编码与精确尺寸规则
+---
+
+[GPT Image 系列](/docs/image/gpt-image-2)、[Nano Banana 系列](/docs/image/nano-banana)与[Grok](/docs/image/grok)共用 OpenAI Images 的基本请求与响应结构：`model`、`prompt`、编辑参考图，以及 `data[].url` / `data[].b64_json`。
+
+本页说明 Klong 图片接口的参数，依据 2026-09-24 的平台接口复测整理。`aspect_ratio`、`image_size` 等属于平台扩展，不代表所有上游原生接受这些字段。模型可用档位、数量与精确尺寸能力仍取决于渠道。Gemini 字段见[Gemini 协议](/docs/image/gemini)。
+
+## 字段速查
+
+| 参数 | 作用 | 平台规则与适用范围 |
+| --- | --- | --- |
+| `model` | 选择模型与渠道 | 使用后台已有名称 |
+| `prompt` | Images 提示词 | 文生图、编辑都需要 |
+| `image` / `reference_images` | 编辑参考图 | JSON URL / Data URL 数组；multipart 使用 `image` 或 `image[]` 文件字段 |
+| `size` | 明确像素或兼容旧尺寸写法 | `2048x2048` 优先级最高；也兼容 `16:9`、`2K` |
+| `aspect_ratio` | 宽高比 | 正整数比例，如 `1:1`、`16:9`、`9:16` |
+| `image_size` | 分辨率档位 | `1K` / `2K` / `4K`，大小写不敏感 |
+| `response_format` | 图片怎样出现在响应里 | Images 使用 `url` 或 `b64_json`；受分组强制策略约束，不可直接套到 Chat |
+| `output_format` | 图片字节的真实编码 | `png` / `jpeg` / `webp`；`jpg` 等同 `jpeg` |
+| `quality` | 请求的质量偏好 | 支持的档位及实际应用取决于模型和渠道 |
+| `n` | 请求图片数量 | 推荐 `1`；接收多图参数不保证所有渠道足量交付，Responses 当前固定一张 |
+| `stream` | 使用 SSE 响应 | 发送完成后的图片，不提供中间帧 |
+
+## 尺寸：像素、比例与档位
+
+推荐按需求选择一种写法：
+
+| 需求 | 请求字段 |
+| --- | --- |
+| 只指定宽高比 | `"aspect_ratio": "16:9"` |
+| 只指定分辨率档位 | `"image_size": "2K"` |
+| 同时指定比例和档位 | `"aspect_ratio": "16:9", "image_size": "2K"` |
+| 指定目标像素 | `"size": "2048x2048"` |
+| 精确输出指定像素 | 已有 `-exact` 模型 + `"size": "2048x2048"` |
+
+可以只传比例或档位。平台会按渠道协议转换：OpenAI 上游使用像素 `size`，Gemini 上游使用 `imageConfig`，不会要求上游识别平台扩展字段。缺少另一维时，转换器或上游会采用默认值，并非必然原样留空。
+
+> **GPT 只传比例暂有兼容风险。** 复测中 `16:9` 曾合成为 `1024x576`，被上游以低于最小像素数拒绝。优先显式传入已验证的 `1024x1024` 或 `1536x1024`；不要把反复重试当作尺寸校验的解决方案。
+
+### 优先级
+
+1. 明确像素 `size` 优先于所有比例和档位字段；被覆盖字段即使无效也会忽略。
+2. 旧写法 `size: "3:2"` 当前会覆盖同时传入的 `aspect_ratio`；独立 `image_size` / `resolution` 则优先于旧 `size` 中的档位。新请求不要混用旧 `size` 比例与专用比例字段。
+3. 字段别名按 `aspect_ratio > aspectRatio`、`image_size > resolution > imageSize` 选取；随后再应用上述 `size` 规则。
+
+例如下列请求采用 `2048x2048`，不会采用 `16:9` 或 `4K`：
+
+```json
+{
+  "model": "gpt-image-2-high",
+  "prompt": "画一棵树",
+  "size": "2048x2048",
+  "aspect_ratio": "16:9",
+  "image_size": "4K"
+}
+```
+
+旧写法 `"size": "16:9", "resolution": "2K"` 仍兼容；新接入建议使用 `aspect_ratio` 和 `image_size`。
+
+Responses 的尺寸、质量和编码可以放在顶层或 `image_generation` 工具内。同类选项先采用工具内值，再按上述像素优先级合并；顶层已有像素 `size` 仍会覆盖工具内比例和档位。`response_format` 放在请求顶层。完整示例见[Chat 与 Responses](/docs/image/openai-chat-responses)。
+
+### 目标尺寸与精确尺寸
+
+普通渠道把尺寸作为生成目标，不保证最终逐像素一致。`2K` / `4K` 是档位，不是对某个固定宽高的承诺；下载后可读取图片实际宽高。复测中 `16:9 + 2K` 分别得到 GPT 的 `2560x1440`、Nano2 / Gemini Flash 的 `2752x1536`，因此不能将其理解为固定 `2048x1152`。本轮未实测 4K。
+
+需要严格像素时，使用已有的 `gpt-image-2-exact` 或 `gpt-image-2.5-exact`，并传入像素 `size`：
+
+```json
+{
+  "model": "gpt-image-2-exact",
+  "prompt": "未来城市夜景，霓虹灯光，电影感广角构图",
+  "size": "3840x2160",
+  "output_format": "jpeg"
+}
+```
+
+GPT-Image 分组只有 **`-exact` 模型 + 明确像素 `size`** 同时满足才触发精确缩放。最终图像用 Lanczos 缩放到指定宽高，每边允许 `64`–`4096`。比例不一致时整图拉伸，不做居中裁剪。`-exact` 只传比例或档位时不会触发精确缩放。Nano 等渠道是否启用精确尺寸由管理员配置，不要自行给模型名添加后缀。
+
+## 返回方式与文件编码
+
+`response_format` 决定响应如何承载图片；`output_format` 决定图片本身是什么格式，两者独立。
+
+### 返回策略优先级
+
+**分组强制策略 > 请求中该协议的格式参数 > 分组默认策略。**
+
+| 分组策略 | 未指定格式 | 请求指定格式 |
+| --- | --- | --- |
+| 默认 URL | URL | 采用请求值 |
+| 默认 Base64 | Base64 | 采用请求值 |
+| 强制 URL | URL | 仍为 URL |
+| 强制 Base64 | Base64 | 仍为 Base64 |
+
+Images 与本平台 Responses 用 `response_format`；Gemini 用 `generationConfig.responseModalities`；当前 NewAPI Chat 不接受字符串图片 `response_format`，请按所选分组的返回方式处理，或改用 Images。省略参数不是永久固定 URL 或 Base64。自行通过 NewAPI 接入时，参数覆盖方法见[NewAPI 配置](/docs/admin/newapi-overrides)。
+
+### 文件编码
+
+| 请求 | 结果 |
+| --- | --- |
+| `response_format: "url", output_format: "webp"` | URL 指向真实 WebP 文件 |
+| `response_format: "b64_json", output_format: "jpeg"` | JPEG 字节的 Base64 |
+| `response_format: "b64_json", output_format: "png"` | PNG 字节的 Base64 |
+
+省略 `output_format` 时，非流式 Images、Chat 和 Responses 保留生成或缩放后的编码；Images SSE 默认 PNG。需要特定文件格式时应显式指定，不要仅修改下载文件后缀。
+
+已有透明像素在 PNG / WebP 编码时可保留；JPEG 转换会将透明区域填白。这不等于支持通过 `background: "transparent"` 生成透明图。编码发生在生成、缩放之后；转换错误不会自动重新生图。判断格式应检查真实图片字节，而不是只改文件后缀。
+
+### 各接口的图片位置
+
+| 接口 | `url` 模式 | `b64_json` 模式 |
+| --- | --- | --- |
+| 非流式 Images | `data[].url` | `data[].b64_json`，无 Data URL 前缀 |
+| Chat（分组策略控制） | Markdown 图片 URL | Markdown 中的 `data:image/...;base64,...` |
+| 本平台 Responses | 图片工具项 `result` 为 URL | 图片工具项 `result` 为裸 Base64 |
+| Images SSE | 完成事件含 `url` | 完成事件含 `b64_json` |
+| Gemini 普通 / SSE | `parts[].text` 与 `parts[].file_data.file_uri` 引用同一图片 | `parts[].inline_data.data` |
+
+Images SSE 的 URL 完成事件是平台扩展，不要套用只识别 `b64_json` 的解析器。Gemini 两个相同 URL 引用只算一张图；Responses 多个完成事件可能重复携带同一图片项，按 `id` 去重。参见[Chat 与 Responses](/docs/image/openai-chat-responses)。
+
+## SDK 扩展字段
+
+Python SDK 可用 `extra_body` 传递比例、档位及尚未暴露的服务端字段：
+
+```python
+result = client.images.generate(
+    model="gpt-image-2-high",
+    prompt="画一棵树",
+    response_format="b64_json",
+    extra_body={
+        "aspect_ratio": "16:9",
+        "image_size": "2K",
+        "output_format": "webp",
+    },
+)
+```
+
+`extra_body` 只负责发送额外请求字段，不会让接口自动支持这些参数。实际支持范围仍由选中的模型渠道决定。`quality` 也遵循这一原则：接收字段不表示所有上游都会按该档位生成，渠道说明见[模型介绍](/docs/models/overview)。
+
+## 当前限制与错误处理
+
+| 项目 | 当前边界 |
+| --- | --- |
+| `mask`、`output_compression` | 当前接口不支持这些参数控制 |
+| `background` | 当前不提供透明背景控制 |
+| `partial_images` | 没有真实生成中间帧；SSE 主要交付完成图片 |
+| 多图 `n` | GPT VIP 普通请求 `n=2` 实测只返回一张；GPT High SSE 返回两张，不代表所有渠道都已通过 |
+| 4K、所有模型与编码组合 | 未穷举验证；不要将单个用例通过视为通用能力保证 |
+
+客户端应检查 HTTP 状态、错误体和实际图片项。SSE 即使已经返回 HTTP 200，也可能携带错误事件。图片 URL 下载失败时先重试原 URL，不要直接重新生图；生成超时不一定代表上游没有执行，重新提交可能重复消耗额度。

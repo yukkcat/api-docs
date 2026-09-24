@@ -1,0 +1,84 @@
+---
+title: Grok Images
+description: OpenAI Images generation, editing, and URL / Base64 examples for Grok
+---
+
+`grok-imagine-image-2.0` uses the platform's OpenAI Images endpoints, sharing the request and response structure with [GPT Image](/en/docs/image/gpt-image-2) and [Nano](/en/docs/image/nano-banana). Use the model name assigned in the Console without changing or splitting suffixes.
+
+The September 24, 2026 tests verified Base64 generation and multipart editing with URL delivery. This page describes Klong's compatibility API, not the full capabilities of every official xAI model, parameter, or endpoint.
+
+## Generate an image as Base64
+
+```bash
+curl https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "grok-imagine-image-2.0",
+    "prompt": "Draw one blue circle centered on a white background, simple flat illustration. No text.",
+    "response_format": "b64_json"
+  }'
+```
+
+Response excerpt:
+
+```json
+{
+  "created": 1790264086,
+  "data": [
+    {
+      "b64_json": "<IMAGE_BASE64>",
+      "revised_prompt": "Draw one blue circle centered on a white background, simple flat illustration. No text."
+    }
+  ]
+}
+```
+
+`b64_json` is bare Base64 without a `data:image/...;base64,` prefix. The tested default output decoded as JPEG. Use the shared `output_format` parameter when a specific encoding is required; do not infer encoding from a filename. Every encoding combination has not been live-tested with Grok.
+
+## Edit an image and return a URL
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=grok-imagine-image-2.0" \
+  -F "prompt=Change the blue circle in the reference image to red. Keep the white background and other shapes." \
+  -F "response_format=url" \
+  -F "image=@reference.png"
+```
+
+Let cURL generate the multipart `Content-Type` and boundary. Do not set `application/json` for this request.
+
+```json
+{
+  "created": 1790264088,
+  "data": [
+    {
+      "url": "https://example.com/images/result.jpg",
+      "revised_prompt": "Change the blue circle in the reference image to red. Keep the white background and other shapes."
+    }
+  ]
+}
+```
+
+Download `data[].url`; do not look in `choices` or Gemini `parts`. Do not attach your API key to image downloads. The URL retrieves the result rather than generating another image.
+
+## Parameters and compatibility
+
+| Requirement | Usage and boundary |
+| --- | --- |
+| URL / Base64 | Images uses `response_format: "url"` / `"b64_json"`, subject to forced group policy |
+| Omitted selector | Follows the group default; not every group has the same default |
+| PNG / JPEG / WebP | Use `output_format`; see shared processing rules. Default JPEG was verified for Grok in this run |
+| Pixels, ratio, tier | Shared dimension fields apply; their effects were not individually tested for Grok |
+| Image count | Start with one image; do not copy another model's count limit |
+| Chat / Responses / SSE | These Grok combinations were not tested in this run; start with Images |
+| Masks, transparent backgrounds, compression quality | These parameter controls are not currently supported by the API |
+
+See [Dimensions and output formats](/en/docs/image/openai-parameters) for shared rules and the four delivery policies. When the selected group forces URL or Base64, request parameters cannot override that delivery format.
+
+## Understanding upstream 502 errors
+
+If a request returns HTTP 502 and `Upstream temporarily unavailable, please retry later`, the message alone cannot identify credentials, credits, or a specific parameter as the cause. The September 24, 2026 tests did not reproduce the earlier 502; this is not a permanent availability or latency guarantee.
+
+Keep the request ID, HTTP status, returned error message, and request parameters submitted to the API when investigating. Do not repeatedly switch delivery formats or regenerate just to eliminate a 502. Distinguish generation failures from download failures; retry the original image URL for the latter.

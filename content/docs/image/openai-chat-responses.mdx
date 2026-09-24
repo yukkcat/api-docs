@@ -1,0 +1,230 @@
+---
+title: Chat / Responses 生图
+description: OpenAI 图片模型的消息输入、工具调用、返回格式和 SSE 读取方式
+---
+
+本页介绍平台的 `/v1/chat/completions` 和 `/v1/responses` 生图入口。2026-09-24 的实测覆盖了 `nano-banana2` 的 Chat 文生图 SSE、普通图生图，以及 `gpt-image-2-vip` 的 Responses 普通 URL、SSE Base64 文生图。其他模型与入口组合需要渠道支持，不能仅替换模型名就假定全部可用。
+
+基础 Images 生成与编辑见[GPT Image 系列](/docs/image/gpt-image-2)，尺寸优先级、精确尺寸和文件编码见[OpenAI 图片参数](/docs/image/openai-parameters)。所有请求使用 `Authorization: Bearer <API_KEY>`，没有独立的 `/chat` 路径。
+
+## Chat Completions
+
+选择已开放 Chat 生图的图片模型并传入 `messages`。普通文本模型仍走文本对话流程。建议先使用单图请求：
+
+```bash
+curl https://api.klong.lat/v1/chat/completions \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nano-banana2",
+    "messages": [{"role": "user", "content": "画一棵树，极简插画风"}],
+    "size": "1024x1024",
+    "output_format": "jpeg",
+    "n": 1
+  }'
+```
+
+当前 NewAPI 入口不能接收 Chat 中的字符串 `response_format: "url"` 或 `"b64_json"`：它会在转发前返回 HTTP 400，提示 `GeneralOpenAIRequest.response_format` 无法解析字符串。Chat 标准的同名字段用于[结构化文本输出](https://developers.openai.com/api/docs/guides/structured-outputs)，与 Images 的图片交付参数不同；放入 SDK 的 `extra_body` 也不能绕过这个解析。
+
+因此本页 Chat 示例不传 `response_format`，图片交付方式由分组策略决定。如果需要每次请求明确选择 URL 或 Base64，请使用 [Images 接口](/docs/image/gpt-image-2)。NewAPI 配置注意事项见[渠道参数覆盖](/docs/admin/newapi-overrides)。
+
+多图能力取决于渠道。若返回多张图片，它们位于同一条助手消息，而不是多条 Chat choices；本轮 Chat 只验证单图，不保证 `n > 1` 能按数量交付。
+
+### 参考图输入
+
+编辑时将 `content` 改成文本与图片块数组：
+
+```json
+{
+  "model": "nano-banana2",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "给这只海獭戴上一顶贝雷帽"},
+        {
+          "type": "image_url",
+          "image_url": {"url": "data:image/png;base64,<PNG_BASE64>"}
+        }
+      ]
+    }
+  ],
+  "size": "1024x1024",
+  "n": 1,
+  "output_format": "png"
+}
+```
+
+`image_url.url` 也可以是服务端可访问的 HTTPS 图片 URL。多张参考图使用多个图片块。
+
+### Chat 返回与 SDK
+
+图片位于 `choices[0].message.content`，内容是 Markdown。以下为响应节选：
+
+```json
+{
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "![image_1](https://example.com/result.jpg)"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+```
+
+本轮实测在当前分组默认下返回上述 Markdown URL。配置为 Base64 交付时，平台的 Chat 结构使用 `![image_1](data:image/jpeg;base64,<JPEG_BASE64>)`，不会新增 Images API 的 `data[].b64_json` 字段；这一分组配置未在本轮线上逐项切换测试。
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
+result = client.chat.completions.create(
+    model="nano-banana2",
+    messages=[{"role": "user", "content": "画一棵树"}],
+    extra_body={
+        "size": "1024x1024",
+        "output_format": "jpeg",
+        "n": 1,
+    },
+)
+print(result.choices[0].message.content)
+```
+
+这里的 `extra_body` 只传平台图片尺寸、编码和数量扩展，不传字符串 `response_format`。客户端需要从 Markdown 中提取图片链接；不能把整个 `content` 当作裸 URL。
+
+### Chat 流式响应
+
+请求增加 `"stream": true`，读取 `choices[].delta.content` 并拼接。图片完成后才发送其 Markdown，随后发送停止块、用量块和 `[DONE]`，不会逐步传输生成中间帧。简化事件如下：
+
+```text
+data: {"choices":[{"index":0,"delta":{"role":"assistant","content":"![image_1](https://example.com/result.jpg)"},"finish_reason":null}]}
+
+data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: {"choices":[],"usage":{"estimated":true}}
+
+data: [DONE]
+```
+
+用量块的 `choices` 可以为空，解析时不能无条件读取 `choices[0]`。保持接收超时足以覆盖生图耗时，`stream` 不代表服务端会立即发送图片内容。
+
+本轮标准 Chat SSE 首次请求返回 400，重试后成功。示例说明可用的请求与解析结构，不代表每次上游生成都会成功。
+
+## Responses
+
+请求需要 `input`，并通过 `tools` 中的 `image_generation` 选择生图。当前平台 Responses 每次返回一张图片，`n` 不会增加图片数量。以下使用已实测的 `gpt-image-2-vip`：
+
+```bash
+curl https://api.klong.lat/v1/responses \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2-vip",
+    "input": "画一棵树，极简插画风",
+    "tools": [{
+      "type": "image_generation",
+      "size": "1024x1024",
+      "output_format": "png"
+    }],
+    "response_format": "url"
+  }'
+```
+
+尺寸、`quality` 和 `output_format` 可以位于顶层或图片工具中，同类参数优先使用工具内设置，再应用像素 `size` 优先规则。推荐像示例一样集中放在图片工具中。
+
+这里顶层的 `response_format: "url" | "b64_json"` 是平台 Responses 图片扩展，已通过当前 NewAPI 入口实测，不代表其他提供商也支持。未传时使用分组默认；分组强制 URL 或强制 Base64 时，以强制策略为准。详见[图片交付策略](/docs/image/openai-parameters)。
+
+### Responses 参考图
+
+参考图输入结构使用消息数组，图片块类型是 `input_image`，文本块类型是 `input_text`。下面是平台支持的请求形式，本轮没有单独复测 Responses 图生图；已实测的编辑方式见 [Images 图生图](/docs/image/gpt-image-2)。
+
+```json
+{
+  "model": "gpt-image-2-vip",
+  "input": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "input_text", "text": "给这只海獭戴上一顶贝雷帽"},
+        {"type": "input_image", "image_url": "data:image/png;base64,<PNG_BASE64>"}
+      ]
+    }
+  ],
+  "tools": [{"type": "image_generation", "size": "1024x1024", "output_format": "webp"}],
+  "response_format": "b64_json"
+}
+```
+
+### Responses 返回与 SDK
+
+查找 `output[]` 中 `type` 为 `image_generation_call` 的项目；不要按数组固定位置假设它是文本消息。以下为响应节选：
+
+```json
+{
+  "id": "resp_example",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "ig_1",
+      "type": "image_generation_call",
+      "status": "completed",
+      "result": "https://example.com/result.png",
+      "revised_prompt": "画一棵树，极简插画风"
+    }
+  ]
+}
+```
+
+实际交付为 URL 时，`result` 是图片 URL；实际交付为 Base64 时，`result` 是裸 Base64，不带 `data:image/...;base64,` 前缀。两种模式都保留 Responses 封装。下面请求 WebP Base64，仍受分组强制策略约束：
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
+result = client.responses.create(
+    model="gpt-image-2-vip",
+    input="画一棵树",
+    extra_body={
+        "tools": [{
+            "type": "image_generation",
+            "size": "1024x1024",
+            "output_format": "webp",
+        }],
+        "response_format": "b64_json",
+    },
+)
+for item in result.output:
+    if item.type == "image_generation_call":
+        print(item.result)
+```
+
+### Responses 流式响应
+
+请求增加 `"stream": true`。读取每个 SSE `data:` 的 JSON `type` 字段：
+
+| `type` | 客户端处理 |
+| --- | --- |
+| `response.created` / `response.in_progress` | 记录响应状态 |
+| `response.output_item.done` | 检查 `item.type`，读取图片项 `item.result` |
+| `response.completed` | 完整响应位于 `response`，图片位于 `response.output[]` |
+| `response.done` | 兼容结束事件；图片可能已在上面的事件中读取 |
+
+```text
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"ig_1","type":"image_generation_call","status":"completed","result":"<WEBP_BASE64>"}}
+```
+
+本轮 Responses SSE 中，同一个 `ig_1` 依次出现在 `response.output_item.done`、`response.completed` 和 `response.done` 中，代表同一张图的完成状态，不是三张图。请在同一次响应内按图片项 `id` 去重。
+
+实测流没有 `data: [DONE]`，客户端不能一直等待这个标记。应按完成事件判断响应结束；若其他渠道发送 `[DONE]`，也可兼容识别。图片结果在生成完成后发送，没有 Images SSE 的 `image_generation.completed` 事件，也不提供生成中间帧。
+
+## 失败与解析
+
+Chat 和 Responses 生图失败时可能在建立 SSE 之前返回普通非成功 HTTP JSON，先检查状态码与 `Content-Type`，再决定按 JSON 或 SSE 解析。错误对象和 Python SDK 捕获方式见[GPT Image 错误处理](/docs/image/gpt-image-2#错误处理)。
+
+流式解析应忽略 SSE 注释，识别 `[DONE]`，并处理响应中的错误对象；收到连接结束但没有成功图片或完成结果时，不应标记生图成功。

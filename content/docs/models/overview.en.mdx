@@ -11,13 +11,13 @@ Capabilities, channels, and prices may change. See the [API pricing page](https:
 
 | Subgroup | Models | Description |
 | --- | --- | --- |
-| Standard | `gpt-image-2`, `gpt-image-2.5`, `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst` | All four names are the same model; high-quality Lanczos upscaling supports 1K / 2K / 4K |
+| Standard | `gpt-image-2`, `gpt-image-2.5`, `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst` | All four names use the same model in this group; supports 1K / 2K / 4K targets, with generation and upscaling determined by channel configuration |
 | Exact size | `gpt-image-2-exact`, `gpt-image-2.5-exact` | Both names are the same model; `size` is enforced after processing, up to 1K / 2K / 4K |
 | Direct 1K | `gpt-image-2-1k`, `gpt-image-2.5-1k` | Direct 1K output from the upstream website; no upscaling, resizing, or other post-processing |
 
 All models in the GPT-Image group (Standard, Exact-size, and Direct 1K) cost ¥0.02 per image. After a ¥100 prepaid or cumulative spend, contact the service provider to request ¥0.01 per image. The channel supports high concurrency, up to about 20,000 requests; stability depends on the upstream website.
 
-For the Standard subgroup, `size` is a target and the final pixels are not guaranteed to match it exactly. A `1024x1024` request may return `1250x1250` or `1249x1251`. The `-exact` variants apply high-quality Lanczos resizing and center cropping, then enforce the requested dimensions; a large ratio mismatch can crop the image, and unusual ratios may look stretched.
+For the Standard subgroup, `size` is a target, not a guarantee of exact pixels. For exact output, use an `-exact` model with an explicit `size: "WIDTHxHEIGHT"`: the full image is resized with Lanczos without cropping, so a ratio mismatch can stretch it. `aspect_ratio` or `image_size` alone does not trigger exact sizing. See [Dimensions and output formats](/en/docs/image/openai-parameters).
 
 ## Image-generation group
 
@@ -25,8 +25,11 @@ For the Standard subgroup, `size` is a target and the final pixels are not guara
 | --- | --- | --- |
 | `gpt-image-2-vip` | OpenAI Images API | `quality` is fixed to `medium`; native output up to 4K |
 | `gpt-image-2-high` | OpenAI Images API | `quality` supports `medium` / `high`; native output up to 4K |
-| `nano-banana2` | OpenAI Images API (NewAPI relay) | Uses the OpenAI Images API, not the native Gemini request format |
-| `nano-banana-pro` | OpenAI Images API (NewAPI relay) | Uses the OpenAI Images API, not the native Gemini request format |
+| `nano-banana2` | OpenAI Images API (NewAPI relay) | Shares GPT Image generation, editing, and URL / Base64 response structures |
+| `nano-banana-pro` | OpenAI Images API (NewAPI relay) | Shares GPT Image generation, editing, and URL / Base64 response structures |
+| `grok-imagine-image-2.0` | OpenAI Images API (NewAPI relay) | Single-image generation and multipart editing verified; see [Grok](/en/docs/image/grok) |
+
+Channel capability descriptions are not parameter-by-parameter acceptance results. The September 24, 2026 tests covered main generation and editing paths for GPT High / VIP, Nano2 / Pro, and Grok, not every 4K or parameter combination. See [shared parameters](/en/docs/image/openai-parameters#current-limits-and-failure-handling) for count shortfalls, GPT ratio-only sizing, and Chat format-selection limits.
 
 ## image2.5 official channel
 
@@ -41,7 +44,7 @@ Both official models support native 1K / 2K / 4K. `quality` supports five levels
 
 | Model | Protocol | Endpoint |
 | --- | --- | --- |
-| `gemini-3.1-flash-image-preview` | Native Gemini protocol | `POST /v1beta/models/{model}:generateContent` |
-| `gemini-3-pro-image-preview` | Native Gemini protocol | `POST /v1beta/models/{model}:generateContent` |
+| `gemini-3.1-flash-image-preview` | Gemini-compatible protocol | `POST /v1beta/models/{model}:generateContent` |
+| `gemini-3-pro-image-preview` | Gemini-compatible protocol | `POST /v1beta/models/{model}:generateContent` |
 
-The Banana group uses the native Gemini request body. Do not send these two models to the OpenAI Images API. See the [Nano Banana documentation](/en/docs/image/nano-banana) for the full request format.
+For Gemini calls in this group, see [Gemini protocol](/en/docs/image/gemini). For OpenAI Images calls, see [Nano series](/en/docs/image/nano-banana) and select a model with an OpenAI route enabled in the Console. A model name alone does not determine its protocol; support depends on the group and channel.

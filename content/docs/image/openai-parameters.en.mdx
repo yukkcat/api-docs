@@ -1,0 +1,151 @@
+---
+title: Dimensions and Output Formats
+description: Dimension precedence, delivery formats, file encodings, and exact-size rules for OpenAI image requests
+---
+
+The [GPT Image series](/en/docs/image/gpt-image-2), [Nano Banana series](/en/docs/image/nano-banana), and [Grok](/en/docs/image/grok) share the basic OpenAI Images request and response structure: `model`, `prompt`, edit references, and `data[].url` / `data[].b64_json`.
+
+This page covers Klong's image API parameters, checked against the September 24, 2026 platform API tests. `aspect_ratio` and `image_size` are platform extensions, not fields every upstream accepts natively. Tiers, counts, and exact sizing depend on the channel. See [Gemini protocol](/en/docs/image/gemini) for its selectors.
+
+## Field reference
+
+| Parameter | Purpose | Platform behavior and scope |
+| --- | --- | --- |
+| `model` | Select model and channel | Use an existing service model name |
+| `prompt` | Images prompt | Required for generation and editing |
+| `image` / `reference_images` | Edit references | JSON URL / Data URL arrays; multipart files named `image` or `image[]` |
+| `size` | Explicit pixels or legacy dimension syntax | `2048x2048` has highest priority; `16:9` and `2K` also accepted |
+| `aspect_ratio` | Aspect ratio | Positive integer ratios such as `1:1`, `16:9`, `9:16` |
+| `image_size` | Resolution tier | `1K` / `2K` / `4K`, case insensitive |
+| `response_format` | How the image is delivered | Images accepts `url` or `b64_json`, subject to forced group policy; do not copy this string field into Chat |
+| `output_format` | Actual image encoding | `png` / `jpeg` / `webp`; `jpg` means `jpeg` |
+| `quality` | Requested quality preference | Supported tiers and behavior depend on model and channel |
+| `n` | Requested image count | Prefer `1`; accepting a count does not guarantee every channel delivers it. Responses currently returns one image |
+| `stream` | SSE response | Completed images, without intermediate frames |
+
+## Dimensions: pixels, ratio, and tier
+
+Choose fields according to your requirement:
+
+| Requirement | Request fields |
+| --- | --- |
+| Aspect ratio only | `"aspect_ratio": "16:9"` |
+| Resolution tier only | `"image_size": "2K"` |
+| Both ratio and tier | `"aspect_ratio": "16:9", "image_size": "2K"` |
+| Target pixel dimensions | `"size": "2048x2048"` |
+| Exact output pixels | Existing `-exact` model + `"size": "2048x2048"` |
+
+A ratio or tier can be supplied alone. The platform converts these options for the selected protocol: a pixel `size` for OpenAI upstreams, or `imageConfig` for Gemini upstreams. The upstream is not expected to understand the platform extensions. Missing dimensions may be filled by the converter or upstream defaults.
+
+> **GPT ratio-only requests currently have a compatibility risk.** In testing, `16:9` was converted to `1024x576` and rejected for falling below the upstream's minimum pixel count. Prefer an explicitly tested size such as `1024x1024` or `1536x1024`; repeated retries are not a solution to size validation.
+
+### Precedence
+
+1. An explicit pixel `size` overrides all ratio and tier fields; overridden fields are ignored even if invalid.
+2. A legacy ratio such as `size: "3:2"` currently overrides a simultaneous `aspect_ratio`. A separate `image_size` / `resolution` takes priority over a tier in legacy `size`. Avoid mixing a legacy `size` ratio with the dedicated ratio field in new requests.
+3. Alias precedence is `aspect_ratio > aspectRatio` and `image_size > resolution > imageSize`, followed by the `size` rules above.
+
+For example, this request uses `2048x2048`, overriding `16:9` and `4K`:
+
+```json
+{
+  "model": "gpt-image-2-high",
+  "prompt": "Draw a tree",
+  "size": "2048x2048",
+  "aspect_ratio": "16:9",
+  "image_size": "4K"
+}
+```
+
+Legacy `"size": "16:9", "resolution": "2K"` is still accepted. Prefer `aspect_ratio` and `image_size` in new integrations.
+
+Responses dimensions, quality, and encoding can be supplied at the top level or in the `image_generation` tool. Tool values override the same options first, followed by pixel-size precedence. A top-level pixel `size` still overrides a tool's ratio and tier. Keep `response_format` at the request's top level. See [Chat and Responses](/en/docs/image/openai-chat-responses) for full examples.
+
+### Target and exact dimensions
+
+Regular channels treat dimensions as generation targets and cannot guarantee exact pixels. `2K` / `4K` are tiers, not promises of a fixed width and height. With `16:9 + 2K`, tests returned `2560x1440` for GPT and `2752x1536` for Nano2 / Gemini Flash, not a fixed `2048x1152`. Read the actual image dimensions. This run did not test 4K.
+
+For strict pixels, use an existing `gpt-image-2-exact` or `gpt-image-2.5-exact` model with a pixel `size`:
+
+```json
+{
+  "model": "gpt-image-2-exact",
+  "prompt": "A futuristic city at night, neon lighting, cinematic wide-angle composition",
+  "size": "3840x2160",
+  "output_format": "jpeg"
+}
+```
+
+In the GPT-Image group, exact resizing requires both an **`-exact` model and an explicit pixel `size`**. The final image is resized with Lanczos to the requested dimensions, with each edge between `64` and `4096`. A ratio mismatch stretches the entire image without a center crop. An `-exact` model supplied only with a ratio or tier does not trigger exact resizing. Exact sizing for Nano and other channels is configured by the administrator; do not append suffixes to model names yourself.
+
+## Delivery and file encoding
+
+`response_format` controls how the response carries an image; `output_format` controls its actual file encoding. They are independent.
+
+### Delivery policy precedence
+
+**Forced group policy > the protocol's request selector > group default.**
+
+| Group policy | Selector omitted | Selector supplied |
+| --- | --- | --- |
+| Default URL | URL | Follow the request |
+| Default Base64 | Base64 | Follow the request |
+| Force URL | URL | Still URL |
+| Force Base64 | Base64 | Still Base64 |
+
+Images and this platform's Responses use `response_format`; Gemini uses `generationConfig.responseModalities`. Current NewAPI Chat rejects a string image `response_format`: handle the selected group's delivery format or use the Images endpoint. Omitting the selector does not permanently mean URL or Base64. If you connect through your own NewAPI instance, see [NewAPI setup](/en/docs/admin/newapi-overrides) for parameter overrides.
+
+### File encoding
+
+| Request | Result |
+| --- | --- |
+| `response_format: "url", output_format: "webp"` | URL pointing to a real WebP file |
+| `response_format: "b64_json", output_format: "jpeg"` | Base64 of JPEG bytes |
+| `response_format: "b64_json", output_format: "png"` | Base64 of PNG bytes |
+
+When `output_format` is omitted, non-streaming Images, Chat, and Responses preserve the generated or resized encoding; Images SSE defaults to PNG. Set the format explicitly when required instead of just changing the download's file extension.
+
+PNG / WebP can preserve existing transparent pixels; JPEG conversion fills them with white. This does not imply support for generating transparency with `background: "transparent"`. Encoding happens after generation and resizing; a conversion failure does not automatically generate another image. Check the actual bytes instead of only changing the filename extension.
+
+### Where to find the image
+
+| Endpoint | `url` mode | `b64_json` mode |
+| --- | --- | --- |
+| Non-streaming Images | `data[].url` | `data[].b64_json`, without a Data URL prefix |
+| Chat (group policy) | Markdown image URL | `data:image/...;base64,...` in Markdown |
+| Platform Responses | Image tool `result` is a URL | Image tool `result` is raw Base64 |
+| Images SSE | Completion event contains `url` | Completion event contains `b64_json` |
+| Gemini JSON / SSE | `parts[].text` and `parts[].file_data.file_uri` reference the same image | `parts[].inline_data.data` |
+
+URL completion events in Images SSE are a platform extension: a parser that only reads `b64_json` will miss them. Gemini's two identical URL references represent one image. Responses may repeat an image item across completion events; deduplicate by `id`. See [Chat and Responses](/en/docs/image/openai-chat-responses).
+
+## SDK extension fields
+
+Use Python SDK `extra_body` for aspect ratio, resolution tier, and server fields that are not exposed as named arguments:
+
+```python
+result = client.images.generate(
+    model="gpt-image-2-high",
+    prompt="Draw a tree",
+    response_format="b64_json",
+    extra_body={
+        "aspect_ratio": "16:9",
+        "image_size": "2K",
+        "output_format": "webp",
+    },
+)
+```
+
+`extra_body` only adds request fields; it does not make the endpoint support them automatically. Support still depends on the selected model channel. The same applies to `quality`: accepting a field does not promise every upstream applies it. See [Models](/en/docs/models/overview) for channel details.
+
+## Current limits and failure handling
+
+| Feature | Current boundary |
+| --- | --- |
+| `mask`, `output_compression` | These parameter controls are not currently supported by the API |
+| `background` | Does not currently provide transparent-background control |
+| `partial_images` | No real intermediate generation frames; SSE mainly delivers completed images |
+| Multiple images with `n` | GPT VIP non-streaming `n=2` returned one image; GPT High SSE returned two. This does not establish every channel's behavior |
+| 4K and every model / encoding combination | Not exhaustively tested; one successful case is not a universal capability guarantee |
+
+Check HTTP status, errors, and actual image items. An SSE response can carry an error even after HTTP 200. If an image download fails, retry the original URL first instead of regenerating. A generation timeout does not prove the upstream did not execute; resubmitting may consume additional credits.

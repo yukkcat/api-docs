@@ -1,38 +1,32 @@
 ---
-title: GPT Image API
-description: GPT-Image 文生图与图像编辑接口、参数和请求示例
+title: GPT Image 系列
+description: GPT Image 系列的 OpenAI Images 生成、编辑、返回格式与流式调用
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
-模型和渠道说明请查看[模型介绍](/docs/models/overview)。本页只介绍接口、参数和请求示例。
+GPT Image 系列使用 OpenAI 兼容接口。本页示例使用已实测的 `gpt-image-2-high` 和 `gpt-image-2-vip`；请以密钥所属分组提供的模型为准，保留完整模型名，不要自行拆分或替换后缀。已有的 `gpt-image-2`、`gpt-image-2.5`、`-exact`、`-1k` 等名称不因本页示例而改名；模型分组和渠道差异见[模型介绍](/docs/models/overview)。
 
-把 `base_url` 换成 `https://api.klong.lat/v1`，官方 SDK 直接用。
+[Nano Banana 系列](/docs/image/nano-banana)共用 Images 请求与响应结构；[Gemini 协议](/docs/image/gemini)使用另一套请求体。尺寸、返回方式和文件编码统一在[OpenAI 图片参数](/docs/image/openai-parameters)中说明，共用格式不代表所有模型渠道都支持每个扩展字段。
 
-> 大部分程序填写 `https://api.klong.lat` 即可。
+## 接口与认证
 
-```http
-POST https://api.klong.lat/v1/images/generations   # 文生图 (application/json)
-POST https://api.klong.lat/v1/images/edits         # 图像编辑 (multipart/form-data)
-Authorization: Bearer <API_KEY>
-```
+SDK 的 `base_url` 使用 `https://api.klong.lat/v1`，API 根地址为 `https://api.klong.lat`。
 
-## 参数
-
-| 参数 | 必填 | 说明 |
+| POST 路径 | 用途 | 图片位置 |
 | --- | --- | --- |
-| `model` | 是 | 模型名称；分组和渠道能力见[模型介绍](/docs/models/overview) |
-| `prompt` | 是 | 提示词，中英文皆可 |
-| `size` | 否 | `宽x高` 像素，如 `1024x1024`、`3840x2160`；两个 `-exact` 模型会严格按该尺寸输出 |
-| `quality` | 否 | VIP 固定为 `medium`；High 支持 `medium` / `high`；官方渠道支持 `low` / `medium` / `high` / `xhigh` / `max` |
-| `n` | 否 | 一次出几张，默认 `1` |
-| `response_format` | 否 | `url`（默认）或 `b64_json` |
-| `stream` | 否 | `true` 时通过当前 SSE 连接持续返回进度 |
-| `image` | 编辑必填 | 仅 `/edits`：参考图文件，可重复传入多张 |
+| `/v1/images/generations` | JSON 文生图 | `data[].url` 或 `data[].b64_json` |
+| `/v1/images/edits` | JSON 或 multipart 编辑 | `data[].url` 或 `data[].b64_json` |
+| `/v1/chat/completions` | GPT 图片模型的消息输入 | `choices[].message.content` 中的 Markdown 图片 |
+| `/v1/responses` | `input` 与 `image_generation` 工具 | `output[]` 中图片工具的 `result` |
 
-## 快速调用
+请求均使用 `Authorization: Bearer <API_KEY>`。下面以 GPT 图片渠道为例；Chat 与 Responses 的完整格式见[对话与 Responses 生图](/docs/image/openai-chat-responses)。
 
-<Tabs items={['cURL', 'Python', 'Node.js', 'PHP', 'Go', 'Java', 'C#']}>
+## 文生图
+
+最少提供 `model` 和 `prompt`。首次接入建议使用 `n: 1`、明确的像素尺寸和返回方式，先验证能正确读取一张图片。
+
+<Tabs items={['cURL', 'Python']}>
 <Tab>
 
 ```bash
@@ -40,9 +34,12 @@ curl https://api.klong.lat/v1/images/generations \
   -H "Authorization: Bearer <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-image-2",
+    "model": "gpt-image-2-high",
     "prompt": "湖蓝色调的山谷，清晨薄雾，极简插画风",
-    "size": "1024x1536"
+    "size": "1024x1024",
+    "response_format": "url",
+    "output_format": "webp",
+    "n": 1
   }'
 ```
 
@@ -56,246 +53,208 @@ pip install openai
 ```python
 from openai import OpenAI
 
-client = OpenAI(api_key="<API_KEY>", base_url="https://api.klong.lat/v1")
-
-resp = client.images.generate(
-    model="gpt-image-2",
+client = OpenAI(
+    api_key="<API_KEY>",
+    base_url="https://api.klong.lat/v1",
+)
+result = client.images.generate(
+    model="gpt-image-2-high",
     prompt="湖蓝色调的山谷，清晨薄雾，极简插画风",
-    size="1024x1536",
+    response_format="url",
+    size="1024x1024",
+    n=1,
+    extra_body={
+        "output_format": "webp",
+    },
 )
-
-print(resp.data[0].url)
+print(result.data[0].url)
 ```
 
-</Tab>
-<Tab>
-
-```bash
-npm install openai
-```
-
-```javascript
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  apiKey: "<API_KEY>",
-  baseURL: "https://api.klong.lat/v1",
-});
-
-const resp = await client.images.generate({
-  model: "gpt-image-2",
-  prompt: "湖蓝色调的山谷，清晨薄雾，极简插画风",
-  size: "1024x1536",
-});
-
-console.log(resp.data[0].url);
-```
-
-</Tab>
-<Tab>
-
-```php
-<?php
-$ch = curl_init("https://api.klong.lat/v1/images/generations");
-curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
-        "Authorization: Bearer <API_KEY>",
-        "Content-Type: application/json",
-    ],
-    CURLOPT_POSTFIELDS => json_encode([
-        "model" => "gpt-image-2",
-        "prompt" => "湖蓝色调的山谷，清晨薄雾，极简插画风",
-        "size" => "1024x1536",
-    ]),
-]);
-
-echo curl_exec($ch);
-```
-
-</Tab>
-<Tab>
-
-```go
-package main
-
-import (
-    "bytes"
-    "fmt"
-    "io"
-    "net/http"
-)
-
-func main() {
-    body := []byte(`{"model":"gpt-image-2","prompt":"湖蓝色调的山谷，清晨薄雾，极简插画风","size":"1024x1536"}`)
-    req, _ := http.NewRequest("POST", "https://api.klong.lat/v1/images/generations", bytes.NewReader(body))
-    req.Header.Set("Authorization", "Bearer <API_KEY>")
-    req.Header.Set("Content-Type", "application/json")
-
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil { panic(err) }
-    defer resp.Body.Close()
-
-    data, _ := io.ReadAll(resp.Body)
-    fmt.Println(string(data))
-}
-```
-
-</Tab>
-<Tab>
-
-```java
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
-public class Main {
-  public static void main(String[] args) throws Exception {
-    String body = """
-      {"model":"gpt-image-2","prompt":"湖蓝色调的山谷，清晨薄雾，极简插画风","size":"1024x1536"}
-      """;
-
-    HttpRequest request = HttpRequest.newBuilder()
-        .uri(URI.create("https://api.klong.lat/v1/images/generations"))
-        .header("Authorization", "Bearer <API_KEY>")
-        .header("Content-Type", "application/json")
-        .POST(HttpRequest.BodyPublishers.ofString(body))
-        .build();
-
-    var response = HttpClient.newHttpClient().send(
-        request, HttpResponse.BodyHandlers.ofString());
-    System.out.println(response.body());
-  }
-}
-```
-
-</Tab>
-<Tab>
-
-```csharp
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-
-using var client = new HttpClient();
-client.DefaultRequestHeaders.Authorization =
-    new AuthenticationHeaderValue("Bearer", "<API_KEY>");
-
-var response = await client.PostAsJsonAsync(
-    "https://api.klong.lat/v1/images/generations",
-    new {
-        model = "gpt-image-2",
-        prompt = "湖蓝色调的山谷，清晨薄雾，极简插画风",
-        size = "1024x1536"
-    }
-);
-
-Console.WriteLine(await response.Content.ReadAsStringAsync());
-```
+`extra_body` 用于传入 SDK 尚未暴露为命名参数的扩展字段。
 
 </Tab>
 </Tabs>
 
-### 精确尺寸请求
+`n` 默认为 `1`。多图能力取决于具体模型和执行方式：2026-09-24 复测中，`gpt-image-2-vip` 普通 Images 请求 `n: 2` 只返回了 1 张；`gpt-image-2-high` 的 Images SSE 返回了 2 张不同图片，但为顺序执行。生产接入优先使用 `n: 1`；请求多张时务必检查实际返回数量，不能只凭 HTTP 200 判断全部完成。
 
-需要图片严格符合指定像素尺寸时，在 `/generations` 中使用 `gpt-image-2-exact` 或 `gpt-image-2.5-exact`，并传入 `size`。模型处理规则见[模型介绍](/docs/models/overview)。
+### 比例与分辨率档位
 
-```bash
-curl https://api.klong.lat/v1/images/generations \
-  -H "Authorization: Bearer <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-image-2-exact",
-    "prompt": "未来城市夜景，霓虹灯光，电影感广角构图",
-    "size": "3840x2160"
-  }'
-```
-
-返回图片的最终尺寸会严格为 `3840x2160`。显式像素尺寸的宽、高需在 `64`～`4096` 之间，总像素不得超过 `4096x4096`；宽高比差异较大时，画面可能被裁切或拉伸。
-
-### 指定质量档位
-
-`quality` 的可用值取决于当前渠道，完整对照见[模型介绍](/docs/models/overview)。下面示例展示官方渠道请求；切换另一个官方模型时只需替换 `model`。
-
-例如，使用官方渠道模型并指定 4K 和质量档：
-
-```bash
-curl https://api.klong.lat/v1/images/generations \
-  -H "Authorization: Bearer <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-image-2.5-sunburst",
-    "prompt": "高端香水产品海报，黑色背景，轮廓光，商业摄影",
-    "size": "3840x2160",
-    "quality": "xhigh"
-  }'
-```
-
-具体可用参数以 API 控制台和上游服务为准。
-
-### 一次出多张 · `n`
-
-```bash
-curl https://api.klong.lat/v1/images/generations \
-  -H "Authorization: Bearer <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-image-2",
-    "prompt": "湖蓝色调的山谷，清晨薄雾，极简插画风",
-    "size": "1024x1024",
-    "n": 2
-  }'
-```
-
-返回的 `data` 数组中就是对应数量的图片。SDK 中同样传 `n=2`，`n` 在 `/edits` 上也生效。
-
-### 图像编辑 · cURL
-
-```bash
-curl https://api.klong.lat/v1/images/edits \
-  -H "Authorization: Bearer <API_KEY>" \
-  -F "model=gpt-image-2" \
-  -F "image=@otter.png" \
-  -F "prompt=给这只海獭戴上一顶贝雷帽"
-```
-
-编辑时不传 `size`，沿用参考图尺寸。不要手动填写 multipart 的 boundary。
-
-### 多张参考图 · cURL
-
-同一个字段名重复出现即可，顺序保留，提示词里用“第一张 / 第二张”指代：
-
-```bash
-curl https://api.klong.lat/v1/images/edits \
-  -H "Authorization: Bearer <API_KEY>" \
-  -F "model=gpt-image-2" \
-  -F "image[]=@teapot.png" \
-  -F "image[]=@duck.png" \
-  -F "prompt=把第二张图里的黄色小鸭子放在第一张图的茶壶旁边，保持同样的桌面和光线"
-```
-
-字段名写 `image[]` 或 `image` 都可以，重复出现即为多张。官方 SDK 传数组时发送的是 `image[]`。
-
-### 多张参考图 · Python (OpenAI SDK)
-
-```python
-resp = client.images.edit(
-    model="gpt-image-2",
-    image=[open("teapot.png", "rb"), open("duck.png", "rb")],
-    prompt="把第二张图里的黄色小鸭子放在第一张图的茶壶旁边",
-)
-```
-
-## 响应
+不需要精确像素时，可以用下面的字段替代 `size`：
 
 ```json
 {
-  "created": 1781837823,
-  "data": [
-    { "url": "https://<DOWNLOAD_HOST>/generated/<FILE>.png" }
-  ]
+  "aspect_ratio": "16:9",
+  "image_size": "2K"
 }
 ```
 
-不传 `response_format` 时返回 `url`；传 `response_format=b64_json` 时，每个元素改为 `{"b64_json": "..."}`。`n>1` 时，`data` 数组中按顺序返回多张图片。
+明确的像素 `size` 优先于这两个字段。比例和档位并不保证固定像素：本次 GPT 的 `16:9 + 2K` 实际为 `2560x1440`，仅传 `image_size: "2K"` 实际为 `2048x2048`。最终尺寸还取决于渠道处理方式。
+
+仅传 `aspect_ratio: "16:9"` 的一次请求被转换成 `1024x576`，触发上游最小像素限制；同体重试成功不代表该组合稳定。需要稳定接入时，优先明确使用已验证的 `1024x1024` 或 `1536x1024` 等尺寸。详细规则见[OpenAI 图片参数](/docs/image/openai-parameters)。
+
+## 图像编辑
+
+编辑请求提供 `prompt` 和至少一张参考图。可以继续使用 `aspect_ratio`、`image_size`、`size`、`response_format` 和 `output_format`；省略尺寸时交由上游决定，不保证沿用参考图的精确像素。
+
+### JSON：URL 或 Data URL
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2-vip",
+    "prompt": "给这只海獭戴上一顶贝雷帽，保留原来的光线",
+    "reference_images": ["data:image/png;base64,<PNG_BASE64>"],
+    "size": "1024x1024",
+    "n": 1,
+    "response_format": "b64_json",
+    "output_format": "png"
+  }'
+```
+
+将 `<PNG_BASE64>` 替换为实际图片编码；也可以在 `reference_images` 数组中传服务端可访问的 HTTPS 图片 URL。平台也兼容 `image`、`image_url`、`images` 等参考图字段；一次请求选择一种写法即可。多张参考图的支持范围和效果取决于渠道，本页不承诺所有组合都已实测。
+
+GPT 的 `/generations` 在携带参考图时也会进入编辑流程。新接入建议明确使用 `/edits`。
+
+### multipart：本地文件
+
+```bash
+curl https://api.klong.lat/v1/images/edits \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "model=gpt-image-2-vip" \
+  -F "image=@input.png" \
+  -F "prompt=将图中的蓝色圆形改成红色，保留其他元素" \
+  -F "size=1024x1024" \
+  -F "n=1" \
+  -F "response_format=url" \
+  -F "output_format=jpeg"
+```
+
+单张上传使用一个 `image` 文件字段；多张参考图可重复使用 `image[]`，是否被上游接受仍取决于渠道。由客户端生成 multipart boundary，不要手动设置 `Content-Type`。
+
+```python
+with open("input.png", "rb") as reference:
+    result = client.images.edit(
+        model="gpt-image-2-vip",
+        image=reference,
+        prompt="将图中的蓝色圆形改成红色，保留其他元素",
+        size="1024x1024",
+        n=1,
+        response_format="url",
+        extra_body={"output_format": "jpeg"},
+    )
+print(result.data[0].url)
+```
+
+## 读取结果
+
+返回方式优先级是：**分组强制策略 > 请求中的 `response_format` > 分组默认策略**。分组可配置默认 URL、默认 Base64、强制 URL、强制 Base64。以下示例以分组没有强制覆盖为前提；省略参数不等于所有分组都返回 URL。
+
+### URL
+
+设置 `response_format: "url"` 后，图片位于 `data[].url`。以下响应省略了部分字段：
+
+```json
+{
+  "created": 1790120000,
+  "data": [
+    {
+      "url": "https://api.klong.lat/images/example.webp",
+      "revised_prompt": "湖蓝色调的山谷，清晨薄雾，极简插画风"
+    }
+  ],
+  "usage": {"estimated": true}
+}
+```
+
+`usage` 还可能包含输入、输出和总 token 数；出现 `estimated: true` 时表示该用量是估算值。URL 以实际响应为准，需要长期保存的图片请及时转存。
+
+### Base64
+
+设置 `response_format: "b64_json"`，图片项变为：
+
+```json
+{
+  "b64_json": "<WEBP_BASE64>",
+  "revised_prompt": "湖蓝色调的山谷，清晨薄雾，极简插画风"
+}
+```
+
+`b64_json` 是图片字节的 Base64，不含 `data:` 前缀。用 `output_format` 明确编码后按对应后缀保存：
+
+```python
+import base64
+from pathlib import Path
+
+result = client.images.generate(
+    model="gpt-image-2-high",
+    prompt="湖蓝色调的山谷，清晨薄雾，极简插画风",
+    response_format="b64_json",
+    size="1024x1024",
+    n=1,
+    extra_body={"output_format": "webp"},
+)
+Path("result.webp").write_bytes(base64.b64decode(result.data[0].b64_json))
+```
+
+## Images 流式响应
+
+在 JSON 中增加 `"stream": true`，multipart 使用 `-F "stream=true"`。cURL 使用 `-N` 关闭输出缓冲。
+
+```bash
+curl -N https://api.klong.lat/v1/images/generations \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-image-2-high","prompt":"画一棵树","size":"1024x1024","n":1,"stream":true,"response_format":"url","output_format":"png"}'
+```
+
+```text
+event: image_generation.completed
+data: {"type":"image_generation.completed","url":"https://example.com/result.png","output_format":"png","size":"1024x1024"}
+```
+
+以上为事件字段节选。编辑返回 `image_edit.completed`；在 `/generations` 提交参考图时也属于编辑事件。每张完成图片对应一个完成事件，`size` 表示该图片的实际像素。
+
+Images SSE 也遵循最终交付策略：URL 模式的完成事件携带 `url`，Base64 模式携带 `b64_json`。URL 完成事件是本平台的兼容扩展，不能假设所有官方 SDK 都能直接处理。流式接口发送完整图片，不提供生成中间帧或实时进度百分比；`: keep-alive` 等 SSE 注释应忽略。
+
+## 已验证范围与限制
+
+2026-09-24 的真实调用覆盖了 high 文生图、vip 图生图、URL/Base64、部分像素尺寸、PNG/JPEG/WebP 和 Images SSE，并非每个模型与参数的全组合认证。
+
+- 当前接口不支持 `mask` 和 `output_compression`；`background` 不提供透明背景控制。
+- `output_format` 控制文件编码；JPEG、PNG 或 WebP 不等于图片交付方式。`jpg` 作为 JPEG 别名已有实测。
+- Chat 和 Responses 有独立限制，不应把 Images 参数原样照搬；特别是 NewAPI Chat 不接受字符串图片参数 `response_format`。见[对话与 Responses 生图](/docs/image/openai-chat-responses)。
+
+## 错误处理
+
+先检查 HTTP 状态码，再读取 `error.message`。例如编辑缺少参考图：
+
+```json
+{
+  "error": {
+    "message": "image file or image_url is required",
+    "type": "invalid_request_error",
+    "param": "image",
+    "code": "request_invalid"
+  }
+}
+```
+
+SDK 会为非成功 HTTP 响应抛出 `APIStatusError`：
+
+```python
+from openai import APIStatusError
+
+try:
+    result = client.images.generate(
+        model="gpt-image-2-high", prompt="画一棵树",
+        size="1024x1024", n=1, response_format="url",
+    )
+except APIStatusError as exc:
+    body = exc.response.json()
+    error = body.get("error", {})
+    print(exc.status_code, error.get("code"), error.get("message"))
+```
+
+`type`、`param` 和 `code` 可能随错误而变化或省略。参数错误应修正请求；限流和上游故障根据 HTTP 状态与错误码处理，避免无条件重复生图。Images SSE 已开始后还可能收到 `event: error`，其 `data.error` 使用相同的错误对象，应按失败结束当前请求。

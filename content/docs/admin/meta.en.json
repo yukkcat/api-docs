@@ -1,0 +1,6 @@
+{
+  "title": "NewAPI Setup",
+  "root": true,
+  "defaultOpen": true,
+  "pages": ["newapi-overrides"]
+}
